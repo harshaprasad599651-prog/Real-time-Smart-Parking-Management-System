@@ -17,6 +17,8 @@ public class VehicleCategory {
 
     public static final String COLLECTION = "vehicleCategories";
     public static final String F_CATEGORY_NAME = "categoryName";
+    public static final String F_DESCRIPTION = "description";
+    public static final String F_COMPATIBLE_SLOT_TYPES = "compatibleSlotTypes";
 
     @Id
     private String id;
@@ -30,8 +32,12 @@ public class VehicleCategory {
     public VehicleCategory(String categoryName, String description, Set<SlotType> compatibleSlotTypes) {
         this.categoryName = categoryName;
         this.description = description;
-        this.compatibleSlotTypes = compatibleSlotTypes.isEmpty()
-                ? EnumSet.noneOf(SlotType.class) : EnumSet.copyOf(compatibleSlotTypes);
+        this.compatibleSlotTypes = toEnumSet(compatibleSlotTypes);
+    }
+
+    /** Null-safe copy into an EnumSet (EnumSet.copyOf rejects an empty non-EnumSet collection). */
+    public static EnumSet<SlotType> toEnumSet(Set<SlotType> types) {
+        return types == null || types.isEmpty() ? EnumSet.noneOf(SlotType.class) : EnumSet.copyOf(types);
     }
 
     public boolean isCompatibleWith(SlotType slotType) {

@@ -32,6 +32,7 @@
         <!-- Framework versions -->
         <spring-boot.version>4.1.2</spring-boot.version>
         <javafx.version>21.0.12</javafx.version>
+        <springdoc.version>3.2.0</springdoc.version>
 
         <!-- Plugin versions -->
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>

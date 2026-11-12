@@ -23,6 +23,7 @@ public class ParkingSession {
     public static final String COLLECTION = "parkingSessions";
     public static final String F_TICKET_ID = "ticketId";
     public static final String F_VEHICLE_NUMBER = "vehicleNumber";
+    public static final String F_VEHICLE_CATEGORY = "vehicleCategory";
     public static final String F_SLOT_CODE = "parkingSlotCode";
     public static final String F_STATUS = "status";
     public static final String F_ENTRY_TIME = "entryTime";

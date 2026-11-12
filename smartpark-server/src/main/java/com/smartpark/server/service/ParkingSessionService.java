@@ -7,7 +7,10 @@ import com.smartpark.server.document.SessionStatus;
 import com.smartpark.server.document.SlotStatus;
 import com.smartpark.server.document.User;
 import com.smartpark.server.document.UserRole;
+import com.smartpark.server.dto.ExitLookupResponse;
+import com.smartpark.server.dto.PageResponse;
 import com.smartpark.server.dto.ParkingSessionDto;
+import com.smartpark.server.dto.ParkingSlotDto;
 import com.smartpark.server.dto.VehicleEntryRequest;
 import com.smartpark.server.dto.VehicleExitRequest;
 import com.smartpark.server.exception.NoActiveSessionException;
@@ -20,15 +23,21 @@ import com.smartpark.server.persistence.DuplicateKeys;
 import com.smartpark.server.persistence.IndexNames;
 import com.smartpark.server.persistence.MongoTransactionRunner;
 import com.smartpark.server.repository.ParkingSessionRepository;
+import com.smartpark.server.repository.ParkingSlotRepository;
 import com.smartpark.server.util.Normalizer;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
@@ -76,6 +85,7 @@ public class ParkingSessionService {
 
     private final MongoTemplate mongoTemplate;
     private final ParkingSessionRepository sessionRepository;
+    private final ParkingSlotRepository slotRepository;
     private final UserService userService;
     private final VehicleCategoryService categoryService;
     private final TicketIdGenerator ticketIdGenerator;
@@ -85,6 +95,7 @@ public class ParkingSessionService {
 
     public ParkingSessionService(MongoTemplate mongoTemplate,
                                  ParkingSessionRepository sessionRepository,
+                                 ParkingSlotRepository slotRepository,
                                  UserService userService,
                                  VehicleCategoryService categoryService,
                                  TicketIdGenerator ticketIdGenerator,
@@ -93,6 +104,7 @@ public class ParkingSessionService {
                                  @Value("${smartpark.parking.orphan-slot-grace:PT2M}") Duration orphanGrace) {
         this.mongoTemplate = mongoTemplate;
         this.sessionRepository = sessionRepository;
+        this.slotRepository = slotRepository;
         this.userService = userService;
         this.categoryService = categoryService;
         this.ticketIdGenerator = ticketIdGenerator;
@@ -260,6 +272,60 @@ public class ParkingSessionService {
     public List<ParkingSessionDto> listSessionsBetween(@NotNull Instant from, @NotNull Instant to) {
         return sessionRepository.findByEntryTimeBetweenOrderByEntryTimeDesc(from, to).stream()
                 .map(ParkingSessionDto::from).toList();
+    }
+
+    /**
+     * Exit-gate search: the vehicle's ACTIVE session plus its assigned slot.
+     *
+     * @throws NoActiveSessionException if the vehicle is not currently parked
+     */
+    public ExitLookupResponse lookupForExit(@NotBlank String vehicleNumber) {
+        String vehicle = Normalizer.vehicleNumber(vehicleNumber);
+        ParkingSession session = sessionRepository.findByVehicleNumberAndStatus(vehicle, SessionStatus.ACTIVE)
+                .orElseThrow(() -> new NoActiveSessionException("No active parking session for vehicle " + vehicle));
+        ParkingSlotDto slot = slotRepository.findBySlotCode(session.getParkingSlotCode())
+                .map(ParkingSlotDto::from).orElse(null);
+        long minutes = Math.max(0, Duration.between(session.getEntryTime(), Instant.now()).toMinutes());
+        return new ExitLookupResponse(ParkingSessionDto.from(session), slot, minutes);
+    }
+
+    /**
+     * Historical records, newest entry first. All filters are optional.
+     *
+     * @param from inclusive lower bound on entry time
+     * @param to   exclusive upper bound on entry time
+     */
+    public PageResponse<ParkingSessionDto> searchSessions(String vehicleNumber, SessionStatus status, String slotCode,
+                                                          Instant from, Instant to,
+                                                          @Min(0) int page, @Min(1) @Max(200) int size) {
+        if (from != null && to != null && !from.isBefore(to)) {
+            throw new IllegalArgumentException("'from' must be before 'to'");
+        }
+        Criteria criteria = new Criteria();
+        if (vehicleNumber != null && !vehicleNumber.isBlank()) {
+            criteria.and(ParkingSession.F_VEHICLE_NUMBER).is(Normalizer.vehicleNumber(vehicleNumber));
+        }
+        if (status != null) {
+            criteria.and(ParkingSession.F_STATUS).is(status);
+        }
+        if (slotCode != null && !slotCode.isBlank()) {
+            criteria.and(ParkingSession.F_SLOT_CODE).is(Normalizer.slotCode(slotCode));
+        }
+        if (from != null || to != null) {
+            Criteria entry = criteria.and(ParkingSession.F_ENTRY_TIME);
+            if (from != null) {
+                entry.gte(from);
+            }
+            if (to != null) {
+                entry.lt(to);
+            }
+        }
+        Query q = new Query(criteria);
+        long total = mongoTemplate.count(q, ParkingSession.class);
+        q.with(PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, ParkingSession.F_ENTRY_TIME)));
+        List<ParkingSessionDto> content = mongoTemplate.find(q, ParkingSession.class).stream()
+                .map(ParkingSessionDto::from).toList();
+        return PageResponse.of(content, page, size, total);
     }
 
     // --------------------------------------------------------- reconciliation

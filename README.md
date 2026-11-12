@@ -10,7 +10,9 @@ University **Network Programming** project. Three computers on the same LAN/Wi-F
 
 Clients send commands to the server through a **REST API (HTTP/JSON)** and receive real-time updates through a **WebSocket** (`ws://<server>:8080/ws`). **Only the server connects to MongoDB.** The Entry and Exit clients never talk to the database directly.
 
-> **Current stage:** database layer. The server stores users, vehicle categories, parking slots, parking sessions and activity logs in a local MongoDB, with atomic slot allocation and duplicate prevention. REST endpoints for parking and the JavaFX operator screens are not implemented yet.
+> **Current stage:** REST API. The server exposes category and slot management, vehicle entry and exit, and monitoring endpoints on top of a local MongoDB, with atomic slot allocation and duplicate prevention. The JavaFX operator screens are not implemented yet.
+>
+> **API documentation:** [docs/API.md](docs/API.md) · Swagger UI at `http://localhost:8080/swagger-ui.html` while the server runs · sample requests in [smartpark-server/http/smartpark-api.http](smartpark-server/http/smartpark-api.http)
 
 ---
 
@@ -20,7 +22,7 @@ Clients send commands to the server through a **REST API (HTTP/JSON)** and recei
 |---|---|
 | Language | Java 21 |
 | Build | Maven (multi-module, Maven Wrapper included) |
-| Server | Spring Boot 4.1 · Spring Web MVC · Spring WebSocket · **Spring Data MongoDB** · Bean Validation · BCrypt (spring-security-crypto) |
+| Server | Spring Boot 4.1 · Spring Web MVC · Spring WebSocket · **Spring Data MongoDB** · Bean Validation · BCrypt (spring-security-crypto) · springdoc-openapi (Swagger UI) |
 | Database | **MongoDB Community Server 8.0**, installed locally on the Admin PC (not Atlas) |
 | Desktop client | JavaFX 21 (Controls + FXML) · Java HTTP Client (`java.net.http`) |
 
@@ -49,7 +51,7 @@ SmartPark/
 │       ├── security/      PasswordConfig (BCrypt)
 │       ├── exception/     Domain exceptions
 │       ├── util/          Normalizer (vehicle numbers, codes, usernames)
-│       ├── controller/    REST controllers (HealthController only, for now)
+│       ├── controller/    REST controllers (categories, slots, parking, monitoring, health) + OperatorGuard
 │       └── websocket/     Real-time WebSocket hub
 │
 └── smartpark-client/               JavaFX desktop client (runs on all three PCs)

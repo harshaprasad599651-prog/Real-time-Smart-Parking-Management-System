@@ -28,6 +28,7 @@ public class ParkingSlot {
 
     public static final String COLLECTION = "parkingSlots";
     public static final String F_SLOT_CODE = "slotCode";
+    public static final String F_SLOT_TYPE = "slotType";
     public static final String F_SUPPORTED_CATEGORIES = "supportedVehicleCategories";
     public static final String F_STATUS = "status";
     public static final String F_FLOOR = "floor";

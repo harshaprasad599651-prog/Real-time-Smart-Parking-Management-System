@@ -3,9 +3,12 @@ package com.smartpark.server.service;
 import com.smartpark.server.document.ActivityAction;
 import com.smartpark.server.document.ParkingSlot;
 import com.smartpark.server.document.SlotStatus;
+import com.smartpark.server.document.SlotType;
 import com.smartpark.server.dto.CreateParkingSlotRequest;
 import com.smartpark.server.dto.ParkingSlotDto;
 import com.smartpark.server.dto.SlotOccupancySummary;
+import com.smartpark.server.dto.UpdateParkingSlotRequest;
+import com.smartpark.server.exception.ConcurrentUpdateException;
 import com.smartpark.server.exception.DuplicateResourceException;
 import com.smartpark.server.exception.InvalidStateException;
 import com.smartpark.server.exception.ResourceNotFoundException;
@@ -17,7 +20,10 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
@@ -60,18 +66,7 @@ public class ParkingSlotService {
     public ParkingSlotDto createSlot(@Valid @NotNull CreateParkingSlotRequest request, @NotBlank String actor) {
         String slotCode = Normalizer.slotCode(request.slotCode());
         String row = request.row().trim().toUpperCase(Locale.ROOT);
-
-        Set<String> categories = new TreeSet<>();
-        if (request.supportedVehicleCategories() == null || request.supportedVehicleCategories().isEmpty()) {
-            categories.addAll(categoryService.categoryNamesCompatibleWith(request.slotType()));
-            if (categories.isEmpty()) {
-                throw new InvalidStateException("No vehicle category is compatible with slot type " + request.slotType());
-            }
-        } else {
-            for (String raw : request.supportedVehicleCategories()) {
-                categories.add(categoryService.requireCategory(raw).getCategoryName()); // must exist
-            }
-        }
+        Set<String> categories = resolveCategories(request.slotType(), request.supportedVehicleCategories());
 
         if (repository.existsBySlotCode(slotCode)) {
             throw new DuplicateResourceException("Slot code '" + slotCode + "' already exists");
@@ -90,6 +85,67 @@ public class ParkingSlotService {
         activityLog.record(actor, ActivityAction.SLOT_CREATED,
                 "Created slot " + slotCode + " (" + request.slotType() + ") for " + categories);
         return ParkingSlotDto.from(slot);
+    }
+
+    /**
+     * Replaces type, supported categories and map position of a slot.
+     * <p>
+     * Uses optimistic locking ({@code @Version}): if an operator allocates or releases the
+     * slot between our read and our write, the write is rejected instead of silently
+     * overwriting the new status.
+     *
+     * @throws InvalidStateException      if the slot is OCCUPIED
+     * @throws ConcurrentUpdateException  if the slot changed concurrently
+     * @throws DuplicateResourceException if another slot already uses the new position
+     */
+    public ParkingSlotDto updateSlot(@NotBlank String slotCode, @Valid @NotNull UpdateParkingSlotRequest request,
+                                     @NotBlank String actor) {
+        String code = Normalizer.slotCode(slotCode);
+        ParkingSlot slot = repository.findBySlotCode(code)
+                .orElseThrow(() -> new ResourceNotFoundException("Slot '" + code + "' not found"));
+        if (slot.getStatus() == SlotStatus.OCCUPIED) {
+            throw new InvalidStateException("Slot " + code + " is OCCUPIED; it can be edited after the vehicle leaves");
+        }
+        String row = request.row().trim().toUpperCase(Locale.ROOT);
+        slot.setSlotType(request.slotType());
+        slot.setSupportedVehicleCategories(resolveCategories(request.slotType(), request.supportedVehicleCategories()));
+        slot.setFloor(request.floor());
+        slot.setRow(row);
+        slot.setColumn(request.column());
+        try {
+            slot = repository.save(slot); // version-checked replace
+        } catch (OptimisticLockingFailureException e) {
+            throw new ConcurrentUpdateException("Slot " + code + " was changed by another operator; reload and retry", e);
+        } catch (DuplicateKeyException e) {
+            throw new DuplicateResourceException("Another slot already exists at floor " + request.floor()
+                    + ", row " + row + ", column " + request.column(), e);
+        }
+        activityLog.record(actor, ActivityAction.SLOT_UPDATED, "Updated slot " + code + " (" + request.slotType()
+                + ", floor " + request.floor() + " " + row + request.column() + ") for " + slot.getSupportedVehicleCategories());
+        return ParkingSlotDto.from(slot);
+    }
+
+    /**
+     * Lists slots ordered by floor, row and column. Every filter is optional.
+     *
+     * @param categoryName only slots that accept this vehicle category
+     * @param status       only slots in this status
+     * @param floor        only slots on this floor
+     */
+    public List<ParkingSlotDto> searchSlots(String categoryName, SlotStatus status, Integer floor) {
+        Criteria criteria = new Criteria();
+        if (categoryName != null && !categoryName.isBlank()) {
+            String category = categoryService.requireCategory(categoryName).getCategoryName();
+            criteria.and(ParkingSlot.F_SUPPORTED_CATEGORIES).is(category);
+        }
+        if (status != null) {
+            criteria.and(ParkingSlot.F_STATUS).is(status);
+        }
+        if (floor != null) {
+            criteria.and(ParkingSlot.F_FLOOR).is(floor);
+        }
+        Query q = new Query(criteria).with(Sort.by(ParkingSlot.F_FLOOR, ParkingSlot.F_ROW, ParkingSlot.F_COLUMN));
+        return mongoTemplate.find(q, ParkingSlot.class).stream().map(ParkingSlotDto::from).toList();
     }
 
     public List<ParkingSlotDto> listSlots() {
@@ -149,6 +205,22 @@ public class ParkingSlotService {
             throw new InvalidStateException("Slot " + code + " is " + current.getStatus() + "; expected " + from);
         }
         return ParkingSlotDto.from(updated);
+    }
+
+    /** Explicit categories must all exist; if none are given they are derived from the slot type. */
+    private Set<String> resolveCategories(SlotType slotType, Set<String> requested) {
+        Set<String> categories = new TreeSet<>();
+        if (requested == null || requested.isEmpty()) {
+            categories.addAll(categoryService.categoryNamesCompatibleWith(slotType));
+            if (categories.isEmpty()) {
+                throw new InvalidStateException("No vehicle category is compatible with slot type " + slotType);
+            }
+        } else {
+            for (String raw : requested) {
+                categories.add(categoryService.requireCategory(raw).getCategoryName());
+            }
+        }
+        return categories;
     }
 
     private static Instant now() {
