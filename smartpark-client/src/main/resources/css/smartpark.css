@@ -1,0 +1,81 @@
+/* SmartPark client theme */
+
+.root {
+    -sp-primary: #1f6feb;
+    -sp-primary-dark: #1858c4;
+    -sp-bg: #f4f6fa;
+    -sp-surface: #ffffff;
+    -sp-text: #1c2330;
+    -sp-muted: #5b6577;
+    -sp-ok: #1a7f37;
+    -sp-error: #cf222e;
+    -fx-font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    -fx-font-size: 14px;
+}
+
+.root-pane {
+    -fx-background-color: -sp-bg;
+}
+
+/* Header / footer */
+.header {
+    -fx-background-color: -sp-primary;
+    -fx-padding: 14 24;
+    -fx-spacing: 14;
+}
+.brand {
+    -fx-text-fill: white;
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+}
+.brand-subtitle {
+    -fx-text-fill: rgba(255, 255, 255, 0.85);
+}
+.footer {
+    -fx-padding: 10;
+}
+.footer .label {
+    -fx-text-fill: -sp-muted;
+    -fx-font-size: 12px;
+}
+
+/* Welcome content */
+.welcome-title {
+    -fx-font-size: 30px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -sp-text;
+}
+.welcome-subtitle {
+    -fx-text-fill: -sp-muted;
+    -fx-font-size: 15px;
+}
+.card {
+    -fx-background-color: -sp-surface;
+    -fx-background-radius: 10;
+    -fx-padding: 24;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.10), 12, 0, 0, 3);
+}
+.info {
+    -fx-text-fill: -sp-text;
+}
+
+/* Buttons */
+.primary-button {
+    -fx-background-color: -sp-primary;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 6;
+    -fx-padding: 8 18;
+    -fx-cursor: hand;
+}
+.primary-button:hover {
+    -fx-background-color: -sp-primary-dark;
+}
+
+/* Connection status */
+.status {
+    -fx-font-weight: bold;
+}
+.status-neutral { -fx-text-fill: -sp-muted; }
+.status-ok      { -fx-text-fill: -sp-ok; }
+.status-error   { -fx-text-fill: -sp-error; }

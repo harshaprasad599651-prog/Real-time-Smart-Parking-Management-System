@@ -1,0 +1,58 @@
+# ---------------------------------------------------------------
+# Build output
+# ---------------------------------------------------------------
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+
+# ---------------------------------------------------------------
+# IDE / editor files
+# ---------------------------------------------------------------
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Eclipse / VS Code Java
+.classpath
+.project
+.settings/
+.factorypath
+bin/
+.vscode/
+.apt_generated/
+
+# NetBeans
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+# ---------------------------------------------------------------
+# OS files
+# ---------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------------------------------------------------------------
+# Sensitive / machine-specific configuration
+# ---------------------------------------------------------------
+# Local Spring overrides (database password etc.)
+application-local.yml
+application-local.yaml
+application-local.properties
+application-secret*.yml
+# Per-PC client settings (the built-in defaults in src/main/resources ARE committed)
+/smartpark-client/smartpark-client.properties
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.jks

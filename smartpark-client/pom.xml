@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.smartpark</groupId>
+        <artifactId>smartpark</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>smartpark-client</artifactId>
+    <packaging>jar</packaging>
+
+    <name>SmartPark Client</name>
+    <description>JavaFX desktop client for the Entry, Exit and Admin computers</description>
+
+    <properties>
+        <!-- module-name/main-class used by `mvn javafx:run` -->
+        <client.main.class>com.smartpark.client/com.smartpark.client.app.SmartParkClientApp</client.main.class>
+
+        <!--
+            Optional overrides forwarded to the client JVM by `mvn javafx:run`, e.g.
+            mvnw -pl smartpark-client javafx:run -Dsmartpark.server.host=192.168.1.10
+            Empty values are ignored and the properties file is used instead.
+        -->
+        <smartpark.server.host/>
+        <smartpark.server.port/>
+        <smartpark.terminal.name/>
+    </properties>
+
+    <dependencies>
+        <!-- JavaFX UI toolkit (javafx-graphics and javafx-base come in transitively) -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+        </dependency>
+
+        <!--
+            Java HTTP Client (java.net.http) and its WebSocket API are part of the JDK
+            itself, so no Maven dependency is required. See module-info.java.
+        -->
+
+        <!-- Testing (version managed by the Spring Boot BOM imported in the parent) -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>smartpark-client</finalName>
+        <plugins>
+            <!-- Enables `mvn javafx:run` -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>${client.main.class}</mainClass>
+                    <options>
+                        <option>-Dsmartpark.server.host=${smartpark.server.host}</option>
+                        <option>-Dsmartpark.server.port=${smartpark.server.port}</option>
+                        <option>-Dsmartpark.terminal.name=${smartpark.terminal.name}</option>
+                    </options>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
