@@ -1,7 +1,0 @@
-# Copy this file to `application-local.yml` (same folder) and fill in your values.
-# `application-local.yml` is git-ignored, so your password never gets committed.
-
-spring:
-  datasource:
-    username: smartpark
-    password: change-me

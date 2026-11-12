@@ -4,13 +4,13 @@ University **Network Programming** project. Three computers on the same LAN/Wi-F
 
 | Computer | Runs |
 |---|---|
-| **Admin PC** | `smartpark-server` (Spring Boot + MySQL) **and** `smartpark-client` (admin dashboard) |
+| **Admin PC** | MongoDB Community Server + `smartpark-server` (Spring Boot) **and** `smartpark-client` (admin dashboard) |
 | **Entry PC** | `smartpark-client` (entry operator) |
 | **Exit PC**  | `smartpark-client` (exit operator) |
 
-Clients send commands to the server through a **REST API (HTTP/JSON)** and receive real-time updates through a **WebSocket** (`ws://<server>:8080/ws`).
+Clients send commands to the server through a **REST API (HTTP/JSON)** and receive real-time updates through a **WebSocket** (`ws://<server>:8080/ws`). **Only the server connects to MongoDB.** The Entry and Exit clients never talk to the database directly.
 
-> **Current stage:** project skeleton only. The server starts and exposes `GET /api/health` plus a WebSocket endpoint. The client shows a welcome screen with a *Check server connection* button. Parking features are not implemented yet.
+> **Current stage:** database layer. The server stores users, vehicle categories, parking slots, parking sessions and activity logs in a local MongoDB, with atomic slot allocation and duplicate prevention. REST endpoints for parking and the JavaFX operator screens are not implemented yet.
 
 ---
 
@@ -20,8 +20,8 @@ Clients send commands to the server through a **REST API (HTTP/JSON)** and recei
 |---|---|
 | Language | Java 21 |
 | Build | Maven (multi-module, Maven Wrapper included) |
-| Server | Spring Boot 4.1 · Spring Web MVC · Spring WebSocket · Spring Data JPA · Bean Validation |
-| Database | MySQL 8 (MySQL Connector/J) |
+| Server | Spring Boot 4.1 · Spring Web MVC · Spring WebSocket · **Spring Data MongoDB** · Bean Validation · BCrypt (spring-security-crypto) |
+| Database | **MongoDB Community Server 8.0**, installed locally on the Admin PC (not Atlas) |
 | Desktop client | JavaFX 21 (Controls + FXML) · Java HTTP Client (`java.net.http`) |
 
 ---
@@ -34,19 +34,23 @@ SmartPark/
 ├── mvnw, mvnw.cmd, .mvn/           Maven Wrapper (no Maven installation required)
 │
 ├── smartpark-server/               Spring Boot server (runs on the Admin PC)
-│   ├── application-local.yml.example   Template for local secrets (copy to application-local.yml)
+│   ├── application-local.properties.example   Template for local overrides (git-ignored copy)
 │   └── src/main/java/com/smartpark/server/
 │       ├── SmartParkServerApplication.java
-│       ├── config/        Spring configuration (WebSocketConfig)
-│       ├── controller/    REST controllers (HealthController)
-│       ├── dto/           Request/response objects
-│       ├── entity/        JPA entities                 (later phases)
-│       ├── repository/    Spring Data JPA repositories (later phases)
-│       ├── service/       Business logic / transactions (later phases)
-│       ├── websocket/     Real-time WebSocket hub
-│       ├── security/      Authentication                (later phases)
-│       ├── scheduler/     Background jobs                (later phases)
-│       └── exception/     Error handling                 (later phases)
+│       ├── config/        MongoConfig (transaction manager), WebSocketConfig, SchedulingConfig
+│       ├── document/      @Document classes + enums (User, VehicleCategory, ParkingSlot, ParkingSession, ActivityLog, Counter)
+│       ├── repository/    MongoRepository interfaces
+│       ├── service/       Business logic: UserService, VehicleCategoryService, ParkingSlotService,
+│       │                  ParkingSessionService (atomic allocation), ActivityLogService, TicketIdGenerator
+│       ├── persistence/   MongoIndexInitializer, MongoTransactionRunner, index names
+│       ├── dto/           Request/response records with Bean Validation constraints
+│       ├── bootstrap/     DataSeeder (sample users, categories, slots)
+│       ├── scheduler/     SlotReconciliationJob
+│       ├── security/      PasswordConfig (BCrypt)
+│       ├── exception/     Domain exceptions
+│       ├── util/          Normalizer (vehicle numbers, codes, usernames)
+│       ├── controller/    REST controllers (HealthController only, for now)
+│       └── websocket/     Real-time WebSocket hub
 │
 └── smartpark-client/               JavaFX desktop client (runs on all three PCs)
     └── src/main/
@@ -71,46 +75,123 @@ SmartPark/
 ## Prerequisites
 
 1. **JDK 21 or newer.** Check with `java -version`.
-2. **MySQL 8.x**, only on the Admin PC (the server needs it to start).
+2. **MongoDB Community Server**, only on the Admin PC. See below.
 3. **Maven is optional.** The included wrapper (`mvnw` / `mvnw.cmd`) downloads Maven 3.9 automatically on first use. The first build also needs internet access to download dependencies.
 
 > On Windows use `mvnw.cmd ...` (PowerShell: `.\mvnw.cmd ...`). On Linux/macOS use `./mvnw ...`.
 
 ---
 
-## 1. Database setup (Admin PC, one time)
+## 1. Install and start MongoDB (Admin PC, one time)
 
-Log in to MySQL as root and create a dedicated user:
+### Windows
 
-```sql
-CREATE DATABASE IF NOT EXISTS smartpark CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS 'smartpark'@'localhost' IDENTIFIED BY 'choose-a-password';
-GRANT ALL PRIVILEGES ON smartpark.* TO 'smartpark'@'localhost';
-FLUSH PRIVILEGES;
-```
+1. Download **MongoDB Community Server** (version 8.0, platform *Windows x64*, package *msi*) from <https://www.mongodb.com/try/download/community>.
+2. Run the installer and choose **Complete**. Keep **"Install MongoD as a Service"** ticked ("Run service as Network Service user"). The default data folder `C:\Program Files\MongoDB\Server\8.0\data` is fine.
+   Optionally tick *Install MongoDB Compass* (a GUI to browse the data).
+3. MongoDB now starts automatically with Windows. To check, stop or start it, open PowerShell **as Administrator**:
 
-Then give the server the password **without committing it**. Use one of these:
+   ```powershell
+   Get-Service MongoDB          # Status should be "Running"
+   Start-Service MongoDB
+   Stop-Service MongoDB
+   ```
 
-- **Option A – local file (recommended):** copy `smartpark-server/application-local.yml.example` to `smartpark-server/application-local.yml` and set the password. This file is git-ignored.
-- **Option B – environment variables:**
+4. Test the connection. In Compass connect to `mongodb://localhost:27017`, or install **mongosh** (<https://www.mongodb.com/try/download/shell>) and run:
 
-  ```powershell
-  $env:SMARTPARK_DB_USERNAME = "smartpark"
-  $env:SMARTPARK_DB_PASSWORD = "choose-a-password"
-  ```
+   ```powershell
+   mongosh "mongodb://localhost:27017" --eval "db.runCommand({ ping: 1 })"
+   ```
 
-| Variable | Default |
-|---|---|
-| `SMARTPARK_DB_HOST` | `localhost` |
-| `SMARTPARK_DB_PORT` | `3306` |
-| `SMARTPARK_DB_NAME` | `smartpark` |
-| `SMARTPARK_DB_USERNAME` | `smartpark` |
-| `SMARTPARK_DB_PASSWORD` | *(empty)* |
-| `SMARTPARK_SERVER_PORT` | `8080` |
+You do **not** need to create the database or collections. On first start the server creates `smartpark_db`, all collections and indexes, and loads the sample data.
+
+### Linux (Ubuntu) / macOS
+
+Follow <https://www.mongodb.com/docs/manual/administration/install-community/>, then `sudo systemctl start mongod` (Linux) or `brew services start mongodb-community` (macOS).
+
+### Security notes
+
+- The installer binds MongoDB to `127.0.0.1` (`bindIp` in `mongod.cfg`). **Keep it that way.** Only the SmartPark server, on the same PC, needs it. Do **not** open port 27017 in the firewall.
+- A default local install has no username/password. If you enable authentication, put the credentials in the URI (see §2).
+
+### Optional: enable multi-document transactions
+
+A default install is a *standalone* server, which **does not support transactions**. SmartPark is designed for this. It uses atomic single-document operations plus compensation (see [Concurrency design](#concurrency-design)). If you want transactions as an extra layer, turn the server into a one-node replica set:
+
+1. Edit `C:\Program Files\MongoDB\Server\8.0\bin\mongod.cfg` and add:
+
+   ```yaml
+   replication:
+     replSetName: rs0
+   ```
+
+2. Restart the service (`Restart-Service MongoDB`, as Administrator) and run once:
+
+   ```powershell
+   mongosh --eval "rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: '127.0.0.1:27017' }] })"
+   ```
+
+3. Start the server with `SMARTPARK_MONGODB_URI=mongodb://127.0.0.1:27017/?replicaSet=rs0`.
+   The log then shows `MongoDB multi-document transactions: ENABLED (replica set detected)`.
 
 ---
 
-## 2. Build everything
+## 2. Server configuration
+
+Defaults are in `smartpark-server/src/main/resources/application.properties`. Each setting can be overridden with an **environment variable**, or with a git-ignored `smartpark-server/application-local.properties` (copy `application-local.properties.example`).
+
+| Environment variable | Default | Purpose |
+|---|---|---|
+| `SMARTPARK_MONGODB_URI` | `mongodb://localhost:27017` | MongoDB connection string |
+| `SMARTPARK_MONGODB_DATABASE` | `smartpark_db` | Database name |
+| `SMARTPARK_MONGODB_TRANSACTIONS` | `auto` | `auto` = use transactions if the server is a replica set; `never` = always use the atomic/compensation path |
+| `SMARTPARK_SEED_ENABLED` | `true` | Create sample data on first start (only into empty collections) |
+| `SMARTPARK_SEED_ADMIN_PASSWORD` | `Admin@123` | Password of the sample `admin` account |
+| `SMARTPARK_SEED_ENTRY_PASSWORD` | `Entry@123` | Password of the sample `entry1` account |
+| `SMARTPARK_SEED_EXIT_PASSWORD` | `Exit@123` | Password of the sample `exit1` account |
+| `SMARTPARK_SERVER_PORT` | `8080` | HTTP/WebSocket port |
+
+PowerShell example:
+
+```powershell
+$env:SMARTPARK_MONGODB_URI = "mongodb://localhost:27017"
+$env:SMARTPARK_SEED_ADMIN_PASSWORD = "MyStrongPassword!"
+```
+
+> Seed passwords apply only when the accounts are first created. Change them before any real use.
+
+---
+
+## 3. Data model (database `smartpark_db`)
+
+| Collection | Fields | Unique indexes |
+|---|---|---|
+| `users` | id, username, passwordHash (BCrypt), role (`ADMIN` / `ENTRY_OPERATOR` / `EXIT_OPERATOR`), active, createdAt | `username` |
+| `vehicleCategories` | id, categoryName, description, compatibleSlotTypes | `categoryName` |
+| `parkingSlots` | id, slotCode, slotType, supportedVehicleCategories, status (`AVAILABLE` / `OCCUPIED` / `DISABLED`), floor, row, column, currentTicketId, statusChangedAt, version | `slotCode`; `(floor, row, column)` |
+| `parkingSessions` | id, ticketId, vehicleNumber, vehicleCategory, parkingSlotCode, entryTime, exitTime, status (`ACTIVE` / `COMPLETED`), entryOperator, exitOperator | `ticketId`; **`vehicleNumber` where status = ACTIVE**; **`parkingSlotCode` where status = ACTIVE** |
+| `activityLogs` | id, username, action, description, timestamp | none (indexed by time and by user) |
+| `counters` | internal per-day ticket counters | – |
+
+Vehicle numbers are normalized (`wp cab-1234` → `WPCAB1234`), so formatting differences can't create duplicates.
+
+### Sample data (created on first start)
+
+| Users | Categories | Slots (30) |
+|---|---|---|
+| `admin` / `Admin@123` (ADMIN)<br>`entry1` / `Entry@123` (ENTRY_OPERATOR)<br>`exit1` / `Exit@123` (EXIT_OPERATOR) | CAR, MOTORCYCLE, VAN, ELECTRIC_CAR, ACCESSIBLE | Floor 0: `A-01..A-08` standard, `B-01..B-04` large, `B-05..B-06` EV charging, `B-07..B-08` accessible, `M-01..M-06` motorcycle<br>Floor 1: `C-01..C-08` standard |
+
+### Concurrency design
+
+Two operators can never get the same slot:
+
+1. **Atomic claim.** One `findAndModify` sets a slot to `OCCUPIED` *only if* it is currently `AVAILABLE` and supports the vehicle category. MongoDB applies single-document updates atomically, so exactly one concurrent request matches. The others are told the slot was taken.
+2. **Database-enforced rules.** Partial unique indexes allow only one `ACTIVE` session per vehicle and per slot. They reject a duplicate even if application code is bypassed.
+3. **Consistency without transactions.** On a standalone server, if creating the session fails after the slot was claimed, the claim is undone (guarded by the request's ticket id). A background job releases any slot left `OCCUPIED` without an active session (possible only after a crash), but only once it has been unchanged for 2 minutes. On a replica set, both writes run inside one transaction instead.
+
+---
+
+## 4. Build and test
 
 From the project root:
 
@@ -118,16 +199,18 @@ From the project root:
 .\mvnw.cmd clean verify
 ```
 
-This compiles both modules, runs the unit tests and produces:
+The server's integration tests run against a **real MongoDB**, using the separate database `smartpark_test_db` (never `smartpark_db`). They cover connectivity, document round-trips, indexes, duplicate prevention and concurrent slot allocation (20 operators racing for one slot). If MongoDB is not running, these tests are **skipped**, not failed. To test against another server:
 
-- `smartpark-server/target/smartpark-server.jar` (executable Spring Boot jar)
-- `smartpark-client/target/smartpark-client.jar`
+```powershell
+$env:SMARTPARK_TEST_MONGODB_URI = "mongodb://127.0.0.1:27017/?replicaSet=rs0"
+.\mvnw.cmd -pl smartpark-server test
+```
 
 ---
 
-## 3. Run the server (Admin PC)
+## 5. Run the server (Admin PC)
 
-From the **`smartpark-server` folder** (so `application-local.yml` is found):
+Make sure MongoDB is running, then from the **`smartpark-server` folder** (so `application-local.properties` is found):
 
 ```powershell
 cd smartpark-server
@@ -141,7 +224,7 @@ cd smartpark-server
 java -jar target\smartpark-server.jar
 ```
 
-The server is ready when the log shows `Started SmartParkServerApplication`. Verify it:
+On first start the log shows `MongoDB indexes verified on database 'smartpark_db'` and `Seeded sample data: 3 users, 5 categories, 30 slots`. Check it is up:
 
 ```powershell
 curl http://localhost:8080/api/health
@@ -152,7 +235,7 @@ Stop the server with **Ctrl+C**.
 
 ---
 
-## 4. Run the client (any PC)
+## 6. Run the client (any PC)
 
 From the project root:
 
@@ -184,7 +267,7 @@ By default the client connects to `localhost:8080`. On the Entry and Exit PCs, s
 
 ---
 
-## 5. LAN checklist (three computers)
+## 7. LAN checklist (three computers)
 
 1. Connect all three PCs to the **same** network and give the Admin PC a **fixed IP** (static IP or a DHCP reservation in the router).
 2. Find the Admin PC's IP with `ipconfig` (IPv4 Address).
@@ -195,7 +278,7 @@ By default the client connects to `localhost:8080`. On the Entry and Exit PCs, s
    ```
 
    Make sure the Wi-Fi network profile is set to **Private**.
-4. **Do not** open MySQL port 3306. Only the server talks to the database.
+4. **Do not** open MongoDB port 27017. Only the server, on the same PC, talks to the database.
 5. From the Entry or Exit PC, open `http://<admin-ip>:8080/api/health` in a browser, then start the client with that IP.
 
 ---
@@ -204,8 +287,10 @@ By default the client connects to `localhost:8080`. On the Entry and Exit PCs, s
 
 | Symptom | Cause / fix |
 |---|---|
-| Server fails with `Communications link failure` | MySQL is not running, or the host/port is wrong. |
-| Server fails with `Access denied for user` | Wrong DB username/password. Check `application-local.yml` or the environment variables. |
+| Server log: `Timed out after 30000 ms while waiting to connect` / `Connection refused` to `localhost:27017` | MongoDB is not running. Run `Get-Service MongoDB`, then `Start-Service MongoDB` (as Administrator). |
+| Server fails with `Command failed with error 13 (Unauthorized)` | MongoDB has authentication enabled. Put the username/password in `SMARTPARK_MONGODB_URI`. |
+| Server fails with `Index ... already exists with different options` or `E11000` during start | The database contains data that conflicts with the unique indexes (e.g. created by hand). Fix or remove the duplicates, or use a fresh database name. |
+| Integration tests show as *skipped* | MongoDB was not reachable at `SMARTPARK_TEST_MONGODB_URI` (default `localhost:27017`). |
 | `Port 8080 was already in use` | Another program uses 8080. Start with `SMARTPARK_SERVER_PORT=8081` and point the clients at that port. |
 | Client shows *connection refused* | The server isn't running, or the wrong IP/port is set. |
 | Client shows *timed out* (from another PC) | Firewall is blocking 8080, or the PCs are on different networks or the Wi-Fi has client isolation enabled. |

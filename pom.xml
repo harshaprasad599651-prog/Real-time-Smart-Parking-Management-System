@@ -42,7 +42,7 @@
 
     <dependencyManagement>
         <dependencies>
-            <!-- Spring Boot BOM: manages Spring, Hibernate, MySQL driver, Jackson, test libs... -->
+            <!-- Spring Boot BOM: manages Spring, Spring Data MongoDB, MongoDB driver, Jackson, test libs... -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>

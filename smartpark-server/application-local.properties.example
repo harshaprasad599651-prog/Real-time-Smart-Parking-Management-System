@@ -1,0 +1,10 @@
+# Copy this file to `application-local.properties` (same folder) and adjust.
+# `application-local.properties` is git-ignored, so nothing here gets committed.
+
+# Only needed if MongoDB has authentication enabled or runs elsewhere on the LAN:
+# spring.mongodb.uri=mongodb://smartpark:change-me@localhost:27017/?authSource=admin
+
+# Passwords for the sample accounts created on first start:
+# smartpark.seed.admin-password=change-me
+# smartpark.seed.entry-password=change-me
+# smartpark.seed.exit-password=change-me

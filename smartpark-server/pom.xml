@@ -15,7 +15,7 @@
     <packaging>jar</packaging>
 
     <name>SmartPark Server</name>
-    <description>Central Spring Boot server (REST API + WebSocket) hosted on the Admin computer</description>
+    <description>Central Spring Boot server (REST API + WebSocket + MongoDB) hosted on the Admin computer</description>
 
     <dependencies>
         <!-- REST API (Spring MVC + embedded Tomcat + Jackson) -->
@@ -30,15 +30,16 @@
             <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
 
-        <!-- Persistence -->
+        <!-- Persistence: local MongoDB Community Server via Spring Data MongoDB -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
+            <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
+
+        <!-- BCrypt password hashing only (not the full Spring Security web stack) -->
         <dependency>
-            <groupId>com.mysql</groupId>
-            <artifactId>mysql-connector-j</artifactId>
-            <scope>runtime</scope>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
         <!-- Bean Validation (Jakarta Validation / Hibernate Validator) -->

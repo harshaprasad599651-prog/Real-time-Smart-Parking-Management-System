@@ -1,4 +1,4 @@
 /**
- * Spring Data JPA repository interfaces.
+ * Spring Data MongoDB repository interfaces ({@code MongoRepository}).
  */
 package com.smartpark.server.repository;
