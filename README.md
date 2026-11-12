@@ -10,9 +10,9 @@ University **Network Programming** project. Three computers on the same LAN/Wi-F
 
 Clients send commands to the server through a **REST API (HTTP/JSON)** and receive real-time updates through a **WebSocket** (`ws://<server>:8080/ws`). **Only the server connects to MongoDB.** The Entry and Exit clients never talk to the database directly.
 
-> **Current stage:** REST API. The server exposes category and slot management, vehicle entry and exit, and monitoring endpoints on top of a local MongoDB, with atomic slot allocation and duplicate prevention. The JavaFX operator screens are not implemented yet.
+> **Current stage:** real-time communication. On top of the REST API and the MongoDB layer, every committed change is now pushed over a WebSocket to all connected clients, with heartbeats, automatic reconnection, replay of missed events and duplicate suppression. A command-line Java test client demonstrates it. The JavaFX operator screens are not implemented yet.
 >
-> **API documentation:** [docs/API.md](docs/API.md) · Swagger UI at `http://localhost:8080/swagger-ui.html` while the server runs · sample requests in [smartpark-server/http/smartpark-api.http](smartpark-server/http/smartpark-api.http)
+> **Documentation:** [docs/API.md](docs/API.md) (REST) · [docs/REALTIME.md](docs/REALTIME.md) (WebSocket, REST vs WebSocket, test client) · Swagger UI at `http://localhost:8080/swagger-ui.html` while the server runs · sample requests in [smartpark-server/http/smartpark-api.http](smartpark-server/http/smartpark-api.http)
 
 ---
 
@@ -51,8 +51,9 @@ SmartPark/
 │       ├── security/      PasswordConfig (BCrypt)
 │       ├── exception/     Domain exceptions
 │       ├── util/          Normalizer (vehicle numbers, codes, usernames)
-│       ├── controller/    REST controllers (categories, slots, parking, monitoring, health) + OperatorGuard
-│       └── websocket/     Real-time WebSocket hub
+│       ├── controller/    REST controllers (categories, slots, parking, monitoring, realtime status, health)
+│       ├── event/         Domain events published by services after a committed change
+│       └── websocket/     RealtimeHub (broadcast, replay, heartbeat), handler, handshake check, event relay
 │
 └── smartpark-client/               JavaFX desktop client (runs on all three PCs)
     └── src/main/
@@ -62,7 +63,8 @@ SmartPark/
         │   ├── config/    ClientConfig (server address, terminal name)
         │   ├── net/       REST client built on java.net.http.HttpClient
         │   ├── ui/        FXML controllers
-        │   ├── realtime/  WebSocket client                 (later phases)
+        │   ├── realtime/  RealtimeClient: WebSocket with heartbeat, reconnect, replay, de-duplication
+        │   ├── tools/     RealtimeTestClient (command-line demo / live monitor)
         │   ├── state/     Observable client-side state     (later phases)
         │   ├── print/     Receipt printing                 (later phases)
         │   └── util/      Helpers

@@ -47,6 +47,12 @@
             itself, so no Maven dependency is required. See module-info.java.
         -->
 
+        <!-- JSON for REST bodies and real-time events (Jackson 3, version from the Spring Boot BOM) -->
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
         <!-- Testing (version managed by the Spring Boot BOM imported in the parent) -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -69,6 +75,20 @@
                         <option>-Dsmartpark.server.port=${smartpark.server.port}</option>
                         <option>-Dsmartpark.terminal.name=${smartpark.terminal.name}</option>
                     </options>
+                </configuration>
+            </plugin>
+
+            <!--
+                Runs the command-line real-time test client (no JavaFX needed):
+                mvnw -pl smartpark-client compile exec:java -Dexec.args="demo"
+            -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.1</version>
+                <configuration>
+                    <mainClass>com.smartpark.client.tools.RealtimeTestClient</mainClass>
+                    <cleanupDaemonThreads>false</cleanupDaemonThreads>
                 </configuration>
             </plugin>
         </plugins>

@@ -13,6 +13,7 @@ import com.smartpark.server.dto.ParkingSessionDto;
 import com.smartpark.server.dto.ParkingSlotDto;
 import com.smartpark.server.dto.VehicleEntryRequest;
 import com.smartpark.server.dto.VehicleExitRequest;
+import com.smartpark.server.event.ParkingDomainEvent;
 import com.smartpark.server.exception.NoActiveSessionException;
 import com.smartpark.server.exception.ResourceNotFoundException;
 import com.smartpark.server.exception.SlotNotCompatibleException;
@@ -33,6 +34,7 @@ import jakarta.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -91,6 +93,7 @@ public class ParkingSessionService {
     private final TicketIdGenerator ticketIdGenerator;
     private final MongoTransactionRunner transactionRunner;
     private final ActivityLogService activityLog;
+    private final ApplicationEventPublisher eventPublisher;
     private final Duration orphanGrace;
 
     public ParkingSessionService(MongoTemplate mongoTemplate,
@@ -101,6 +104,7 @@ public class ParkingSessionService {
                                  TicketIdGenerator ticketIdGenerator,
                                  MongoTransactionRunner transactionRunner,
                                  ActivityLogService activityLog,
+                                 ApplicationEventPublisher eventPublisher,
                                  @Value("${smartpark.parking.orphan-slot-grace:PT2M}") Duration orphanGrace) {
         this.mongoTemplate = mongoTemplate;
         this.sessionRepository = sessionRepository;
@@ -110,6 +114,7 @@ public class ParkingSessionService {
         this.ticketIdGenerator = ticketIdGenerator;
         this.transactionRunner = transactionRunner;
         this.activityLog = activityLog;
+        this.eventPublisher = eventPublisher;
         this.orphanGrace = orphanGrace;
     }
 
@@ -137,12 +142,16 @@ public class ParkingSessionService {
             Instant now = now();
             String ticketId = ticketIdGenerator.next(now); // outside any transaction: avoids conflicts on the counter
 
-            ParkingSession session = transactionRunner.execute(inTransaction ->
+            Allocation allocation = transactionRunner.execute(inTransaction ->
                     allocate(vehicle, category, slotCode, ticketId, now, operator.getUsername(), inTransaction));
 
+            // Committed: tell everyone (WebSocket broadcast happens in ParkingEventRelay).
+            ParkingSessionDto session = ParkingSessionDto.from(allocation.session());
+            eventPublisher.publishEvent(new ParkingDomainEvent.VehicleEntered(
+                    session, ParkingSlotDto.from(allocation.slot()), operator.getUsername()));
             activityLog.record(operator.getUsername(), ActivityAction.VEHICLE_ENTRY,
                     "Vehicle " + vehicle + " (" + category + ") parked at " + slotCode + ", ticket " + ticketId);
-            return ParkingSessionDto.from(session);
+            return session;
         } catch (SmartParkException e) {
             activityLog.record(operator.getUsername(), ActivityAction.ALLOCATION_REJECTED,
                     "Entry of " + vehicle + " into " + slotCode + " rejected: " + e.getMessage());
@@ -150,8 +159,12 @@ public class ParkingSessionService {
         }
     }
 
-    private ParkingSession allocate(String vehicle, String category, String slotCode, String ticketId,
-                                    Instant now, String operator, boolean inTransaction) {
+    /** Result of a successful allocation: the new session and the slot as it is now (OCCUPIED). */
+    private record Allocation(ParkingSession session, ParkingSlot slot) {
+    }
+
+    private Allocation allocate(String vehicle, String category, String slotCode, String ticketId,
+                                Instant now, String operator, boolean inTransaction) {
         // Step 1 - atomically claim the slot (matches only if AVAILABLE and compatible).
         Query claimable = query(where(ParkingSlot.F_SLOT_CODE).is(slotCode)
                 .and(ParkingSlot.F_STATUS).is(SlotStatus.AVAILABLE)
@@ -168,11 +181,14 @@ public class ParkingSessionService {
 
         // Step 2 - create the ACTIVE session. Partial unique indexes are the final safety net.
         try {
-            return mongoTemplate.insert(ParkingSession.start(ticketId, vehicle, category, slotCode, now, operator));
+            ParkingSession session = mongoTemplate.insert(
+                    ParkingSession.start(ticketId, vehicle, category, slotCode, now, operator));
+            return new Allocation(session, claimed);
         } catch (DuplicateKeyException e) {
             if (!inTransaction) {
-                // No transaction to roll back: undo step 1 ourselves.
-                boolean released = releaseSlot(slotCode, ticketId, now);
+                // No transaction to roll back: undo step 1 ourselves. No event is published:
+                // other clients never saw this slot as occupied.
+                boolean released = releaseSlot(slotCode, ticketId, now) != null;
                 log.debug("Compensated slot claim {} for ticket {} (released={})", slotCode, ticketId, released);
             }
             if (DuplicateKeys.violates(e, IndexNames.SESSIONS_ACTIVE_VEHICLE)) {
@@ -213,7 +229,7 @@ public class ParkingSessionService {
         String vehicle = Normalizer.vehicleNumber(request.vehicleNumber());
         Instant now = now();
 
-        ParkingSession session = transactionRunner.execute(inTransaction -> {
+        Departure departure = transactionRunner.execute(inTransaction -> {
             // Step 1 - atomically complete the ACTIVE session (only one exit can win).
             ParkingSession completed = mongoTemplate.findAndModify(
                     query(where(ParkingSession.F_VEHICLE_NUMBER).is(vehicle)
@@ -227,20 +243,34 @@ public class ParkingSessionService {
                 throw new NoActiveSessionException("No active parking session for vehicle " + vehicle);
             }
             // Step 2 - free the slot, but only if it is still held by this ticket.
-            if (!releaseSlot(completed.getParkingSlotCode(), completed.getTicketId(), now)) {
+            ParkingSlot released = releaseSlot(completed.getParkingSlotCode(), completed.getTicketId(), now);
+            if (released == null) {
                 log.warn("Slot {} was not held by ticket {} at exit; reconciliation will verify it",
                         completed.getParkingSlotCode(), completed.getTicketId());
             }
-            return completed;
+            return new Departure(completed, released);
         });
 
+        ParkingSessionDto session = ParkingSessionDto.from(departure.session());
+        ParkingSlot slotNow = departure.releasedSlot() != null ? departure.releasedSlot()
+                : slotRepository.findBySlotCode(session.parkingSlotCode()).orElse(null);
+        eventPublisher.publishEvent(new ParkingDomainEvent.VehicleExited(
+                session, slotNow == null ? null : ParkingSlotDto.from(slotNow), operator.getUsername()));
         activityLog.record(operator.getUsername(), ActivityAction.VEHICLE_EXIT,
-                "Vehicle " + vehicle + " left slot " + session.getParkingSlotCode() + ", ticket " + session.getTicketId());
-        return ParkingSessionDto.from(session);
+                "Vehicle " + vehicle + " left slot " + session.parkingSlotCode() + ", ticket " + session.ticketId());
+        return session;
     }
 
-    /** OCCUPIED -> AVAILABLE, only if the slot is still held by {@code ticketId}. */
-    private boolean releaseSlot(String slotCode, String ticketId, Instant now) {
+    /** Result of a successful exit: the completed session and the released slot (null if it was not held). */
+    private record Departure(ParkingSession session, ParkingSlot releasedSlot) {
+    }
+
+    /**
+     * OCCUPIED -> AVAILABLE, only if the slot is still held by {@code ticketId}.
+     *
+     * @return the slot after the release, or {@code null} if it was not held by this ticket
+     */
+    private ParkingSlot releaseSlot(String slotCode, String ticketId, Instant now) {
         Query heldByTicket = query(where(ParkingSlot.F_SLOT_CODE).is(slotCode)
                 .and(ParkingSlot.F_STATUS).is(SlotStatus.OCCUPIED)
                 .and(ParkingSlot.F_CURRENT_TICKET).is(ticketId));
@@ -249,7 +279,7 @@ public class ParkingSessionService {
                 .unset(ParkingSlot.F_CURRENT_TICKET)
                 .set(ParkingSlot.F_STATUS_CHANGED_AT, now)
                 .inc(ParkingSlot.F_VERSION, 1);
-        return mongoTemplate.updateFirst(heldByTicket, release, ParkingSlot.class).getModifiedCount() == 1;
+        return mongoTemplate.findAndModify(heldByTicket, release, options().returnNew(true), ParkingSlot.class);
     }
 
     // ---------------------------------------------------------------- queries
@@ -367,8 +397,11 @@ public class ParkingSessionService {
                 continue;
             }
             fix.set(ParkingSlot.F_STATUS, SlotStatus.AVAILABLE).unset(ParkingSlot.F_CURRENT_TICKET);
-            if (mongoTemplate.updateFirst(unchanged, fix, ParkingSlot.class).getModifiedCount() == 1) {
+            ParkingSlot freed = mongoTemplate.findAndModify(unchanged, fix, options().returnNew(true), ParkingSlot.class);
+            if (freed != null) {
                 released++;
+                eventPublisher.publishEvent(new ParkingDomainEvent.SlotReleased(ParkingSlotDto.from(freed),
+                        "RECONCILIATION", ActivityLogService.SYSTEM_USER));
                 activityLog.record(ActivityLogService.SYSTEM_USER, ActivityAction.SLOT_RECONCILED,
                         "Released orphaned slot " + slot.getSlotCode() + " (ticket " + slot.getCurrentTicketId() + ")");
                 log.warn("Released orphaned slot {} (ticket {})", slot.getSlotCode(), slot.getCurrentTicketId());

@@ -56,6 +56,28 @@ public class ServerApiClient implements AutoCloseable {
                 });
     }
 
+    /** {@code GET path}; the future completes with the response whatever its status code. */
+    public CompletableFuture<HttpResponse<String>> get(String path) {
+        HttpRequest request = HttpRequest.newBuilder(baseUri.resolve(path))
+                .timeout(REQUEST_TIMEOUT)
+                .header("Accept", "application/json")
+                .GET()
+                .build();
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    /** {@code POST path} with a JSON body, identifying the operator with the {@code X-Operator} header. */
+    public CompletableFuture<HttpResponse<String>> post(String path, String operator, String jsonBody) {
+        HttpRequest request = HttpRequest.newBuilder(baseUri.resolve(path))
+                .timeout(REQUEST_TIMEOUT)
+                .header("Accept", "application/json")
+                .header("Content-Type", "application/json")
+                .header("X-Operator", operator)
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                .build();
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+    }
+
     public URI baseUri() {
         return baseUri;
     }

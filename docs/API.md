@@ -138,6 +138,9 @@ Vehicle numbers are normalized: case, spaces and hyphens are ignored, so `wp cab
 | GET | `/api/statistics` | Occupancy and traffic statistics |
 | GET | `/api/activity?username=&limit=50` | Operator activity log, newest first (limit 1-500) |
 | GET | `/api/health` | Server status and server time |
+| GET | `/api/realtime/status` | Clients connected to the WebSocket (operator, role, terminal, address, last heartbeat) |
+
+Real-time events (WebSocket `ws://<server>:8080/ws`) are described in [REALTIME.md](REALTIME.md).
 
 ```jsonc
 // GET /api/parking/sessions?status=COMPLETED&size=2

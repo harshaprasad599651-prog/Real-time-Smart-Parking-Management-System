@@ -34,7 +34,7 @@ public abstract class AbstractApiIntegrationTest extends AbstractMongoIntegratio
             .build();
 
     @Value("${local.server.port}")
-    private int port;
+    protected int port;
 
     @BeforeEach
     void loadSampleData() {

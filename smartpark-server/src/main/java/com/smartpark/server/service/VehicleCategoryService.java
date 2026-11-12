@@ -15,6 +15,8 @@ import com.smartpark.server.util.Normalizer;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import com.smartpark.server.event.ParkingDomainEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Update;
@@ -40,13 +42,16 @@ public class VehicleCategoryService {
     private final MongoTemplate mongoTemplate;
     private final MongoTransactionRunner transactionRunner;
     private final ActivityLogService activityLog;
+    private final ApplicationEventPublisher eventPublisher;
 
     public VehicleCategoryService(VehicleCategoryRepository repository, MongoTemplate mongoTemplate,
-                                  MongoTransactionRunner transactionRunner, ActivityLogService activityLog) {
+                                  MongoTransactionRunner transactionRunner, ActivityLogService activityLog,
+                                  ApplicationEventPublisher eventPublisher) {
         this.repository = repository;
         this.mongoTemplate = mongoTemplate;
         this.transactionRunner = transactionRunner;
         this.activityLog = activityLog;
+        this.eventPublisher = eventPublisher;
     }
 
     public VehicleCategoryDto createCategory(@Valid @NotNull CreateVehicleCategoryRequest request, @NotBlank String actor) {
@@ -62,6 +67,7 @@ public class VehicleCategoryService {
         }
         activityLog.record(actor, ActivityAction.CATEGORY_CREATED,
                 "Created vehicle category " + name + " " + request.compatibleSlotTypes());
+        eventPublisher.publishEvent(new ParkingDomainEvent.ParkingMapChanged("CATEGORY_CREATED", null, name, actor));
         return VehicleCategoryDto.from(category);
     }
 
@@ -113,6 +119,8 @@ public class VehicleCategoryService {
 
         activityLog.record(actor, ActivityAction.CATEGORY_UPDATED,
                 "Updated vehicle category " + name + " " + newTypes);
+        // slot = null: several slots may have changed, so clients reload the slot map.
+        eventPublisher.publishEvent(new ParkingDomainEvent.ParkingMapChanged("CATEGORY_UPDATED", null, name, actor));
         return VehicleCategoryDto.from(updated);
     }
 

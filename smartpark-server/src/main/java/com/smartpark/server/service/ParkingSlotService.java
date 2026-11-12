@@ -19,6 +19,8 @@ import com.smartpark.server.util.Normalizer;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import com.smartpark.server.event.ParkingDomainEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Sort;
@@ -54,13 +56,16 @@ public class ParkingSlotService {
     private final MongoTemplate mongoTemplate;
     private final VehicleCategoryService categoryService;
     private final ActivityLogService activityLog;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ParkingSlotService(ParkingSlotRepository repository, MongoTemplate mongoTemplate,
-                              VehicleCategoryService categoryService, ActivityLogService activityLog) {
+                              VehicleCategoryService categoryService, ActivityLogService activityLog,
+                              ApplicationEventPublisher eventPublisher) {
         this.repository = repository;
         this.mongoTemplate = mongoTemplate;
         this.categoryService = categoryService;
         this.activityLog = activityLog;
+        this.eventPublisher = eventPublisher;
     }
 
     public ParkingSlotDto createSlot(@Valid @NotNull CreateParkingSlotRequest request, @NotBlank String actor) {
@@ -84,7 +89,7 @@ public class ParkingSlotService {
         }
         activityLog.record(actor, ActivityAction.SLOT_CREATED,
                 "Created slot " + slotCode + " (" + request.slotType() + ") for " + categories);
-        return ParkingSlotDto.from(slot);
+        return mapChanged("SLOT_CREATED", ParkingSlotDto.from(slot), actor);
     }
 
     /**
@@ -122,7 +127,7 @@ public class ParkingSlotService {
         }
         activityLog.record(actor, ActivityAction.SLOT_UPDATED, "Updated slot " + code + " (" + request.slotType()
                 + ", floor " + request.floor() + " " + row + request.column() + ") for " + slot.getSupportedVehicleCategories());
-        return ParkingSlotDto.from(slot);
+        return mapChanged("SLOT_UPDATED", ParkingSlotDto.from(slot), actor);
     }
 
     /**
@@ -177,14 +182,14 @@ public class ParkingSlotService {
     public ParkingSlotDto disableSlot(@NotBlank String slotCode, @NotBlank String actor) {
         ParkingSlotDto slot = transition(slotCode, SlotStatus.AVAILABLE, SlotStatus.DISABLED);
         activityLog.record(actor, ActivityAction.SLOT_DISABLED, "Disabled slot " + slot.slotCode());
-        return slot;
+        return mapChanged("SLOT_DISABLED", slot, actor);
     }
 
     /** DISABLED -> AVAILABLE, atomically. */
     public ParkingSlotDto enableSlot(@NotBlank String slotCode, @NotBlank String actor) {
         ParkingSlotDto slot = transition(slotCode, SlotStatus.DISABLED, SlotStatus.AVAILABLE);
         activityLog.record(actor, ActivityAction.SLOT_ENABLED, "Enabled slot " + slot.slotCode());
-        return slot;
+        return mapChanged("SLOT_ENABLED", slot, actor);
     }
 
     /**
@@ -221,6 +226,12 @@ public class ParkingSlotService {
             }
         }
         return categories;
+    }
+
+    /** Announces a committed map change to all connected clients and returns the slot unchanged. */
+    private ParkingSlotDto mapChanged(String reason, ParkingSlotDto slot, String actor) {
+        eventPublisher.publishEvent(new ParkingDomainEvent.ParkingMapChanged(reason, slot, null, actor));
+        return slot;
     }
 
     private static Instant now() {
