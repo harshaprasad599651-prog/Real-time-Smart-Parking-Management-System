@@ -9,6 +9,7 @@ import com.smartpark.server.exception.DuplicateResourceException;
 import com.smartpark.server.exception.OperatorNotAuthorizedException;
 import com.smartpark.server.exception.ResourceNotFoundException;
 import com.smartpark.server.repository.UserRepository;
+import com.smartpark.server.security.AuthTokenService;
 import com.smartpark.server.util.Normalizer;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -32,11 +33,14 @@ public class UserService {
     private final UserRepository repository;
     private final PasswordEncoder passwordEncoder;
     private final ActivityLogService activityLog;
+    private final AuthTokenService tokenService;
 
-    public UserService(UserRepository repository, PasswordEncoder passwordEncoder, ActivityLogService activityLog) {
+    public UserService(UserRepository repository, PasswordEncoder passwordEncoder, ActivityLogService activityLog,
+                       AuthTokenService tokenService) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
         this.activityLog = activityLog;
+        this.tokenService = tokenService;
     }
 
     public UserDto createUser(@Valid @NotNull CreateUserRequest request, @NotBlank String actor) {
@@ -85,6 +89,9 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User '" + username + "' not found"));
         user.setActive(active);
         user = repository.save(user);
+        if (!active) {
+            tokenService.revokeAll(user.getUsername()); // signed out on every terminal
+        }
         activityLog.record(actor, ActivityAction.USER_STATUS_CHANGED,
                 (active ? "Activated" : "Deactivated") + " user " + user.getUsername());
         return UserDto.from(user);

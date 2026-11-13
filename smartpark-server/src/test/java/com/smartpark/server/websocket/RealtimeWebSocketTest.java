@@ -47,13 +47,16 @@ class RealtimeWebSocketTest extends AbstractApiIntegrationTest {
     }
 
     @Test
-    void handshakeIsRefusedForUnknownOrMissingOperator() {
-        for (String operator : new String[]{"ghost", null}) {
-            assertThatThrownBy(() -> WsTestClient.connect(port, operator, "X", null))
-                    .isInstanceOf(ExecutionException.class)
-                    .cause().isInstanceOf(WebSocketHandshakeException.class)
-                    .satisfies(e -> assertThat(((WebSocketHandshakeException) e).getResponse().statusCode()).isEqualTo(403));
-        }
+    void handshakeIsRefusedWithoutCredentialsOrForUnknownOperator() {
+        assertHandshakeStatus(null, 401);     // no token, no operator
+        assertHandshakeStatus("ghost", 403);  // identified, but no such active user
+    }
+
+    private void assertHandshakeStatus(String operator, int status) {
+        assertThatThrownBy(() -> WsTestClient.connect(port, operator, "X", null))
+                .isInstanceOf(ExecutionException.class)
+                .cause().isInstanceOf(WebSocketHandshakeException.class)
+                .satisfies(e -> assertThat(((WebSocketHandshakeException) e).getResponse().statusCode()).isEqualTo(status));
     }
 
     // ------------------------------------------------------------ broadcasting

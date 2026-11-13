@@ -34,14 +34,13 @@ Clients never send commands over the WebSocket. The only client-to-server traffi
 ## 2. Endpoint and handshake
 
 ```
-ws://<server-ip>:8080/ws?operator=entry1&terminal=ENTRY-GATE-1&clientId=<uuid>[&since=<seq>&instance=<id>]
+ws://<server-ip>:8080/ws?terminal=ENTRY-GATE-1&clientId=<uuid>[&since=<seq>&instance=<id>]
+Authorization: Bearer <token from POST /api/auth/login>
 ```
-
-The operator can also be sent in the `X-Operator` header (the Java client does this).
 
 | Parameter | Meaning |
 |---|---|
-| `operator` / `X-Operator` | **Required.** An existing, active user. Otherwise the handshake is refused with **HTTP 403** and the socket never opens. |
+| `Authorization: Bearer …` (or `?access_token=…`) | **Required.** Without a valid token the handshake is refused with **HTTP 401**; for an inactive account with **403**. The socket never opens. The Java client sends the header. When it gets 401/403 it stops retrying and the app returns to the login screen. |
 | `terminal` | Name shown on the admin dashboard, e.g. `ENTRY-GATE-1` |
 | `clientId` | Stable per running client. If a client reconnects while its old connection still looks open (half-open TCP), the server closes the old one (code 1008), so an operator is never counted twice. |
 | `since`, `instance` | Sent on **re**connect: the last sequence processed and the server it came from. The server replays the missed events. |

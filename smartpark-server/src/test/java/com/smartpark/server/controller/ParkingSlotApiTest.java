@@ -116,7 +116,7 @@ class ParkingSlotApiTest extends AbstractApiIntegrationTest {
     @Test
     void slotManagementRequiresAdmin() {
         post("/api/slots/A-03/disable", ENTRY, null).expectProblem(403, "OPERATOR_NOT_AUTHORIZED");
-        post("/api/slots/A-03/disable", null, null).expectProblem(400, "MISSING_HEADER");
+        post("/api/slots/A-03/disable", null, null).expectProblem(401, "UNAUTHENTICATED");
         put("/api/slots/A-03", EXIT, """
                 {"slotType": "STANDARD", "floor": 0, "row": "A", "column": 3}""")
                 .expectProblem(403, "OPERATOR_NOT_AUTHORIZED");

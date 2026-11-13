@@ -6,6 +6,7 @@ public enum ActivityAction {
     USER_STATUS_CHANGED,
     LOGIN_SUCCESS,
     LOGIN_FAILED,
+    LOGOUT,
     CATEGORY_CREATED,
     CATEGORY_UPDATED,
     SLOT_CREATED,

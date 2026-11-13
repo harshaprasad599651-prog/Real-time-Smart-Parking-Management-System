@@ -18,5 +18,13 @@ public record VehicleEntryRequest(
         String slotCode,
 
         @NotBlank
-        String operatorUsername) {
+        String operatorUsername,
+
+        @Size(max = 200)
+        String notes) {
+
+    /** Entry without notes. */
+    public VehicleEntryRequest(String vehicleNumber, String categoryName, String slotCode, String operatorUsername) {
+        this(vehicleNumber, categoryName, slotCode, operatorUsername, null);
+    }
 }

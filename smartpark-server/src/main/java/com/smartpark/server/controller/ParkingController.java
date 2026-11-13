@@ -6,6 +6,7 @@ import com.smartpark.server.dto.PageResponse;
 import com.smartpark.server.dto.ParkingEntryRequest;
 import com.smartpark.server.dto.ParkingExitRequest;
 import com.smartpark.server.dto.ParkingSessionDto;
+import com.smartpark.server.security.AuthenticatedOperator;
 import com.smartpark.server.service.ParkingSessionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -20,7 +21,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -60,10 +60,9 @@ public class ParkingController {
     @ApiErrorResponses.NotFound
     @ApiErrorResponses.Conflict
     public ResponseEntity<ParkingSessionDto> entry(
-            @Parameter(description = "Username of the entry operator", example = "entry1")
-            @RequestHeader(OperatorGuard.HEADER) String operator,
+            @Parameter(hidden = true) AuthenticatedOperator operator,
             @Valid @RequestBody ParkingEntryRequest request) {
-        ParkingSessionDto session = sessionService.startParking(request.withOperator(operator));
+        ParkingSessionDto session = sessionService.startParking(request.withOperator(operator.username()));
         URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
                 .path("/api/parking/sessions/{ticketId}").buildAndExpand(session.ticketId()).toUri();
         return ResponseEntity.created(location).body(session);
@@ -91,10 +90,9 @@ public class ParkingController {
     @ApiErrorResponses.Forbidden
     @ApiErrorResponses.NotFound
     public ParkingSessionDto exit(
-            @Parameter(description = "Username of the exit operator", example = "exit1")
-            @RequestHeader(OperatorGuard.HEADER) String operator,
+            @Parameter(hidden = true) AuthenticatedOperator operator,
             @Valid @RequestBody ParkingExitRequest request) {
-        return sessionService.completeParking(request.withOperator(operator));
+        return sessionService.completeParking(request.withOperator(operator.username()));
     }
 
     // -------------------------------------------------------------- records

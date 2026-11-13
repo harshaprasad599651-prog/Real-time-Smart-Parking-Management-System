@@ -11,24 +11,35 @@ Ready-made requests: [`smartpark-server/http/smartpark-api.http`](../smartpark-s
 
 ---
 
-## Operator identification (interim)
+## Authentication
 
-Every **write** request must include the header
+1. **Sign in:** `POST /api/auth/login`
 
-```
-X-Operator: <username>
-```
+   ```jsonc
+   // request
+   { "username": "entry1", "password": "Entry@123", "terminal": "ENTRY-GATE-1" }
+   // 200 response
+   { "token": "q3J9...Xw", "tokenType": "Bearer", "expiresAt": "2026-11-13T20:15:00Z",
+     "user": { "username": "entry1", "role": "ENTRY_OPERATOR", "active": true, "...": "..." } }
+   ```
 
-The user must exist, be active and have a suitable role:
+   A wrong password, an unknown user and an inactive account all give the same **401** `INVALID_CREDENTIALS`.
+2. **Use the token:** send `Authorization: Bearer <token>` with every write request and with the WebSocket handshake. Each use extends it; it expires after 12 hours unused (`smartpark.security.token-idle-timeout`).
+3. **Check it:** `GET /api/auth/me` returns the current user, or 401 if the token is no longer valid.
+4. **Sign out:** `POST /api/auth/logout` returns **204** and revokes the token immediately.
+
+Tokens are random 256-bit values. The server keeps only their SHA-256 hashes, in memory: restarting the server signs everyone out. Deactivating an account revokes all its tokens.
 
 | Operation | Allowed roles |
 |---|---|
 | Category and slot management | `ADMIN` |
 | Vehicle entry | `ENTRY_OPERATOR`, `ADMIN` |
 | Vehicle exit | `EXIT_OPERATOR`, `ADMIN` |
-| All `GET` requests | no header needed |
+| All `GET` requests | no token needed (read-only, LAN) |
 
-A missing header gives **400** `MISSING_HEADER`. An unknown, inactive or wrong-role user gives **403** `OPERATOR_NOT_AUTHORIZED`. This header will be replaced by login tokens in a later stage.
+Missing, expired or revoked token: **401** `UNAUTHENTICATED`. Inactive account or wrong role: **403** `OPERATOR_NOT_AUTHORIZED`.
+
+> **Development only:** with `smartpark.security.operator-header-enabled=true` (env `SMARTPARK_ALLOW_OPERATOR_HEADER=true`), the server also trusts an `X-Operator: <username>` header **without a password**. It is `false` by default and must stay off in real use; the automated tests enable it for brevity.
 
 ---
 
@@ -78,11 +89,13 @@ When a category's compatible slot types change, every slot of a newly added type
 
 ### Vehicle entry
 
-`POST /api/parking/entry` with header `X-Operator: entry1`
+`POST /api/parking/entry` with header `Authorization: Bearer <token of entry1>`
 
 ```json
-{ "vehicleNumber": "WP CAB-1234", "categoryName": "CAR", "slotCode": "A-01" }
+{ "vehicleNumber": "WP CAB-1234", "categoryName": "CAR", "slotCode": "A-01", "notes": "Roof rack fitted" }
 ```
+
+`notes` is optional (max 200 characters). Blank notes are stored as `null`. Notes are returned in every session response.
 
 Steps on the server:
 1. Validate the input.
@@ -99,7 +112,7 @@ Steps on the server:
   "id": "6734...", "ticketId": "SP-20261113-000001",
   "vehicleNumber": "WPCAB1234", "vehicleCategory": "CAR", "parkingSlotCode": "A-01",
   "entryTime": "2026-11-13T08:15:30.123Z", "exitTime": null, "status": "ACTIVE",
-  "entryOperator": "entry1", "exitOperator": null, "durationMinutes": null
+  "entryOperator": "entry1", "exitOperator": null, "durationMinutes": null, "notes": "Roof rack fitted"
 }
 ```
 
@@ -125,7 +138,7 @@ Vehicle numbers are normalized: case, spaces and hyphens are ignored, so `wp cab
 
    If the vehicle is not parked: **404** `NO_ACTIVE_SESSION`.
 
-2. **Confirm:** `POST /api/parking/exit` with header `X-Operator: exit1` and body `{ "vehicleNumber": "WPCAB1234" }`.
+2. **Confirm:** `POST /api/parking/exit` with `Authorization: Bearer <token of exit1>` and body `{ "vehicleNumber": "WPCAB1234" }`.
    This marks the session COMPLETED, stores the exit time and releases the slot. It returns **200** with the completed session, including `exitTime` and `durationMinutes`. A second exit for the same vehicle gives **404** `NO_ACTIVE_SESSION`.
 
 ### Monitoring and records
@@ -181,7 +194,8 @@ Validation errors also list the offending fields:
 
 | Status | `code` values |
 |---|---|
-| 400 | `VALIDATION_FAILED`, `MALFORMED_REQUEST` (bad JSON or unknown enum value), `MISSING_HEADER`, `INVALID_PARAMETER`, `BAD_REQUEST` |
+| 400 | `VALIDATION_FAILED`, `MALFORMED_REQUEST` (bad JSON or unknown enum value), `INVALID_PARAMETER`, `BAD_REQUEST` |
+| 401 | `UNAUTHENTICATED`, `INVALID_CREDENTIALS` |
 | 403 | `OPERATOR_NOT_AUTHORIZED` |
 | 404 | `NOT_FOUND`, `NO_ACTIVE_SESSION` |
 | 409 | `SLOT_UNAVAILABLE`, `VEHICLE_ALREADY_PARKED`, `DUPLICATE_RESOURCE`, `INVALID_STATE`, `CONCURRENT_UPDATE` |

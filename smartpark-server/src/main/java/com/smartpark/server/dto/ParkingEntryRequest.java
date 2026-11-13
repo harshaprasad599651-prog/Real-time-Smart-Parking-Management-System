@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 
 /**
  * Body of {@code POST /api/parking/entry}. The operator is identified by the
- * {@code X-Operator} header rather than the body.
+ * bearer token (Authorization header), not the body.
  */
 @Schema(description = "Vehicle entering the car park and the slot chosen on the map")
 public record ParkingEntryRequest(
@@ -23,9 +23,13 @@ public record ParkingEntryRequest(
 
         @NotBlank @Size(max = 10)
         @Schema(example = "A-01")
-        String slotCode) {
+        String slotCode,
+
+        @Size(max = 200)
+        @Schema(example = "Scratch on rear bumper", description = "Optional remark by the entry operator")
+        String notes) {
 
     public VehicleEntryRequest withOperator(String operatorUsername) {
-        return new VehicleEntryRequest(vehicleNumber, categoryName, slotCode, operatorUsername);
+        return new VehicleEntryRequest(vehicleNumber, categoryName, slotCode, operatorUsername, notes);
     }
 }

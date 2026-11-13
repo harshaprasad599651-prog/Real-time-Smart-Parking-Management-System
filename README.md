@@ -10,7 +10,7 @@ University **Network Programming** project. Three computers on the same LAN/Wi-F
 
 Clients send commands to the server through a **REST API (HTTP/JSON)** and receive real-time updates through a **WebSocket** (`ws://<server>:8080/ws`). **Only the server connects to MongoDB.** The Entry and Exit clients never talk to the database directly.
 
-> **Current stage:** real-time communication. On top of the REST API and the MongoDB layer, every committed change is now pushed over a WebSocket to all connected clients, with heartbeats, automatic reconnection, replay of missed events and duplicate suppression. A command-line Java test client demonstrates it. The JavaFX operator screens are not implemented yet.
+> **Current stage:** operator workflows. Entry operators register a vehicle, pick a compatible free slot on a live graphical parking map, confirm, and print the receipt. Exit operators find the active session, see the slot highlighted on the map, and confirm the departure. Every terminal's map updates instantly. Admins see the same live map on the Overview.
 >
 > **Documentation:** [docs/API.md](docs/API.md) (REST) · [docs/REALTIME.md](docs/REALTIME.md) (WebSocket, REST vs WebSocket, test client) · Swagger UI at `http://localhost:8080/swagger-ui.html` while the server runs · sample requests in [smartpark-server/http/smartpark-api.http](smartpark-server/http/smartpark-api.http)
 
@@ -59,18 +59,27 @@ SmartPark/
     └── src/main/
         ├── java/module-info.java
         ├── java/com/smartpark/client/
-        │   ├── app/       JavaFX Application entry point
+        │   ├── app/       SmartParkClientApp (start-up wiring), AppContext (shared services)
         │   ├── config/    ClientConfig (server address, terminal name)
-        │   ├── net/       REST client built on java.net.http.HttpClient
-        │   ├── ui/        FXML controllers
+        │   ├── net/       ApiClient (Java HttpClient + Jackson, bearer token, problem+json errors), DTOs
+        │   ├── session/   SessionManager (login/logout/expiry), UserSession, UserRole
+        │   ├── service/   RealtimeService (WebSocket -> JavaFX properties and FX-thread events)
         │   ├── realtime/  RealtimeClient: WebSocket with heartbeat, reconnect, replay, de-duplication
+        │   ├── parking/   SlotMapModel (map state + selection rules), ReceiptData
+        │   ├── ui/
+        │   │   ├── navigation/  View (screens + allowed roles), AccessPolicy, Navigator
+        │   │   ├── login/       LoginController
+        │   │   ├── shell/       MainLayoutController (sidebar, top bar, status bar)
+        │   │   ├── dashboard/   Admin overview (KPIs, usage bars, live map, activity)
+        │   │   ├── parking/     Vehicle entry, vehicle exit, receipt preview + printing
+        │   │   ├── connections/ Connected terminals (admin)
+        │   │   ├── common/      LiveView base class, access-denied screen
+        │   │   └── component/   SlotMapView, StatCard, ActivityFeed, ConnectionIndicator, Icons
         │   ├── tools/     RealtimeTestClient (command-line demo / live monitor)
-        │   ├── state/     Observable client-side state     (later phases)
-        │   ├── print/     Receipt printing                 (later phases)
-        │   └── util/      Helpers
+        │   └── util/      Formats
         └── resources/
-            ├── fxml/welcome.fxml
-            ├── css/smartpark.css
+            ├── fxml/      login, main-layout, dashboard/*, parking/*, connections, access-denied
+            ├── css/smartpark.css             Theme (colours, typography, components)
             └── smartpark-client.properties   Default client settings
 ```
 
@@ -108,6 +117,7 @@ SmartPark/
    ```
 
 You do **not** need to create the database or collections. On first start the server creates `smartpark_db`, all collections and indexes, and loads the sample data.
+
 
 ### Linux (Ubuntu) / macOS
 
@@ -249,7 +259,15 @@ From the project root:
 
 (or from inside `smartpark-client`: `..\mvnw.cmd javafx:run`)
 
-The welcome screen opens. Click **Check server connection** to test the link to the server.
+The login screen opens and shows whether the server is reachable. Sign in with one of the sample accounts:
+
+| Username | Password | Lands on | Sidebar |
+|---|---|---|---|
+| `admin` | `Admin@123` | Overview | Overview, Vehicle Entry, Vehicle Exit, Terminals |
+| `entry1` | `Entry@123` | Vehicle Entry | Vehicle Entry |
+| `exit1` | `Exit@123` | Vehicle Exit | Vehicle Exit |
+
+The top bar shows the live connection to the server (green **Live**, amber **Reconnecting...**, red **Offline**). If the session ends, because the token expired, the server restarted or the account was deactivated, the client returns to the login screen with a message. See [docs/CLIENT.md](docs/CLIENT.md) for how the client is built.
 
 ### Pointing a client at the Admin PC
 

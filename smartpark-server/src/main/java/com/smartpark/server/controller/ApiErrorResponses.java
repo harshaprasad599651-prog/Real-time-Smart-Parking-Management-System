@@ -25,14 +25,16 @@ final class ApiErrorResponses {
 
     @Target(ElementType.METHOD)
     @Retention(RetentionPolicy.RUNTIME)
-    @ApiResponse(responseCode = "400", description = "Validation failed (code VALIDATION_FAILED, MALFORMED_REQUEST, MISSING_HEADER ...)",
+    @ApiResponse(responseCode = "400", description = "Validation failed (code VALIDATION_FAILED, MALFORMED_REQUEST, INVALID_PARAMETER ...)",
             content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
     @interface BadRequest {
     }
 
     @Target(ElementType.METHOD)
     @Retention(RetentionPolicy.RUNTIME)
-    @ApiResponse(responseCode = "403", description = "Operator unknown, inactive or lacks the required role (OPERATOR_NOT_AUTHORIZED)",
+    @ApiResponse(responseCode = "401", description = "Missing, expired or revoked token (UNAUTHENTICATED)",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "403", description = "Account inactive or lacks the required role (OPERATOR_NOT_AUTHORIZED)",
             content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
     @interface Forbidden {
     }

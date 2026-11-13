@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.smartpark.client.ui.common.AccessDeniedController"
+      alignment="CENTER" spacing="14" styleClass="card, denied-card" maxWidth="560">
+    <StackPane fx:id="iconHolder"/>
+    <Label text="You don't have access to this screen" styleClass="section-title"/>
+    <Label fx:id="detail" wrapText="true" styleClass="muted" textAlignment="CENTER"/>
+</VBox>

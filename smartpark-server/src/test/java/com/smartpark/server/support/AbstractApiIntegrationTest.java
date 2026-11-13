@@ -21,7 +21,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * and calls it over HTTP with the JDK HttpClient, exactly as the JavaFX clients will.
  * The sample data (users, categories, 30 slots) is loaded before every test.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        // Most API tests identify the operator with the X-Operator header for brevity. AuthApiTest covers
+        // the real bearer-token login; OperatorHeaderDisabledTest checks the production default (false).
+        properties = "smartpark.security.operator-header-enabled=true")
 public abstract class AbstractApiIntegrationTest extends AbstractMongoIntegrationTest {
 
     protected static final String ADMIN = "admin";
@@ -57,6 +60,30 @@ public abstract class AbstractApiIntegrationTest extends AbstractMongoIntegratio
         return send(withOperator(request(path), operator)
                 .header("Content-Type", "application/json")
                 .PUT(HttpRequest.BodyPublishers.ofString(json)));
+    }
+
+    /** Signs in through POST /api/auth/login and returns the bearer token. */
+    protected String login(String username, String password) {
+        Response r = send(request("/api/auth/login").header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("""
+                        {"username": "%s", "password": "%s", "terminal": "TEST"}""".formatted(username, password))))
+                .expect(200);
+        return r.json("$.token");
+    }
+
+    protected Response getWithToken(String path, String token) {
+        return send(request(path).header("Authorization", "Bearer " + token).GET());
+    }
+
+    protected Response postWithToken(String path, String token, String json) {
+        return send(request(path).header("Authorization", "Bearer " + token)
+                .header("Content-Type", "application/json")
+                .POST(json == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(json)));
+    }
+
+    /** Sends a request with an arbitrary Authorization header value. */
+    protected Response getWithAuthorization(String path, String authorization) {
+        return send(request(path).header("Authorization", authorization).GET());
     }
 
     protected Response enter(String vehicle, String category, String slot) {

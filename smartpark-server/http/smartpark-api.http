@@ -1,35 +1,61 @@
 ### SmartPark API - manual requests
 ### Run with the VS Code "REST Client" extension (humao.rest-client) or IntelliJ's HTTP Client.
 ### Start the server first:  cd smartpark-server ; ..\mvnw.cmd spring-boot:run
+### Run the three "Sign in" requests first: the later requests reuse their tokens.
 ### NOTE: the write requests below change data in smartpark_db.
 
 @base = http://localhost:8080
-@admin = admin
-@entry = entry1
-@exit = exit1
 
 ### Health
 GET {{base}}/api/health
+
+### ------------------------------------------------------------ sign in
+
+# @name adminLogin
+POST {{base}}/api/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "Admin@123", "terminal": "HTTP-CLIENT" }
+
+###
+# @name entryLogin
+POST {{base}}/api/auth/login
+Content-Type: application/json
+
+{ "username": "entry1", "password": "Entry@123", "terminal": "HTTP-CLIENT" }
+
+###
+# @name exitLogin
+POST {{base}}/api/auth/login
+Content-Type: application/json
+
+{ "username": "exit1", "password": "Exit@123", "terminal": "HTTP-CLIENT" }
+
+###
+@admin = {{adminLogin.response.body.token}}
+@entry = {{entryLogin.response.body.token}}
+@exit = {{exitLogin.response.body.token}}
+
+### Who am I?
+GET {{base}}/api/auth/me
+Authorization: Bearer {{admin}}
 
 ### ------------------------------------------------------------ categories
 
 ### List categories
 GET {{base}}/api/categories
 
-### Get one category
-GET {{base}}/api/categories/car
-
 ### Add a category (ADMIN)
 POST {{base}}/api/categories
 Content-Type: application/json
-X-Operator: {{admin}}
+Authorization: Bearer {{admin}}
 
 { "categoryName": "Light truck", "description": "Small trucks", "compatibleSlotTypes": ["LARGE"] }
 
 ### Update a category (ADMIN)
 PUT {{base}}/api/categories/LIGHT_TRUCK
 Content-Type: application/json
-X-Operator: {{admin}}
+Authorization: Bearer {{admin}}
 
 { "description": "Small trucks and pick-ups", "compatibleSlotTypes": ["LARGE"] }
 
@@ -38,52 +64,32 @@ X-Operator: {{admin}}
 ### All slots
 GET {{base}}/api/slots
 
-### Slots accepting motorcycles on floor 0
-GET {{base}}/api/slots?category=MOTORCYCLE&floor=0
-
 ### Available slots for a car (entry operator's map)
 GET {{base}}/api/slots/available?category=CAR
-
-### One slot
-GET {{base}}/api/slots/A-01
 
 ### Add a slot (ADMIN) - categories derived from slotType
 POST {{base}}/api/slots
 Content-Type: application/json
-X-Operator: {{admin}}
+Authorization: Bearer {{admin}}
 
 { "slotCode": "D-01", "slotType": "STANDARD", "floor": 1, "row": "D", "column": 1 }
 
-### Update a slot (ADMIN)
-PUT {{base}}/api/slots/D-01
-Content-Type: application/json
-X-Operator: {{admin}}
-
-{ "slotType": "EV_CHARGING", "floor": 1, "row": "D", "column": 1 }
-
 ### Disable a slot (ADMIN)
 POST {{base}}/api/slots/D-01/disable
-X-Operator: {{admin}}
+Authorization: Bearer {{admin}}
 
 ### Enable a slot (ADMIN)
 POST {{base}}/api/slots/D-01/enable
-X-Operator: {{admin}}
+Authorization: Bearer {{admin}}
 
 ### ---------------------------------------------------------------- parking
 
 ### Vehicle entry (ENTRY_OPERATOR) -> 201 with the receipt data
 POST {{base}}/api/parking/entry
 Content-Type: application/json
-X-Operator: {{entry}}
+Authorization: Bearer {{entry}}
 
 { "vehicleNumber": "WP CAB-1234", "categoryName": "CAR", "slotCode": "A-01" }
-
-### Same slot again -> 409 SLOT_UNAVAILABLE
-POST {{base}}/api/parking/entry
-Content-Type: application/json
-X-Operator: {{entry}}
-
-{ "vehicleNumber": "WP XYZ-9999", "categoryName": "CAR", "slotCode": "A-01" }
 
 ### Exit gate search -> session + slot
 GET {{base}}/api/parking/active/WPCAB1234
@@ -91,7 +97,7 @@ GET {{base}}/api/parking/active/WPCAB1234
 ### Confirm departure (EXIT_OPERATOR)
 POST {{base}}/api/parking/exit
 Content-Type: application/json
-X-Operator: {{exit}}
+Authorization: Bearer {{exit}}
 
 { "vehicleNumber": "WP CAB-1234" }
 
@@ -100,11 +106,12 @@ X-Operator: {{exit}}
 ### Currently parked vehicles
 GET {{base}}/api/parking/sessions/active
 
-### History (paged, newest first)
-GET {{base}}/api/parking/sessions?status=COMPLETED&page=0&size=20
-
 ### Statistics
 GET {{base}}/api/statistics
 
-### Operator activity
-GET {{base}}/api/activity?username=entry1&limit=20
+### Connected terminals
+GET {{base}}/api/realtime/status
+
+### Sign out (revokes the token)
+POST {{base}}/api/auth/logout
+Authorization: Bearer {{admin}}

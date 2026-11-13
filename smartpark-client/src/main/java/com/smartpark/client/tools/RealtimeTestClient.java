@@ -1,17 +1,18 @@
 package com.smartpark.client.tools;
 
 import com.smartpark.client.config.ClientConfig;
-import com.smartpark.client.net.ServerApiClient;
+import com.smartpark.client.net.ApiClient;
+import com.smartpark.client.net.dto.ApiDtos.LoginRequest;
+import com.smartpark.client.net.dto.ApiDtos.LoginResponse;
+import com.smartpark.client.net.dto.ApiDtos.ParkingSession;
 import com.smartpark.client.realtime.ConnectionAck;
 import com.smartpark.client.realtime.ConnectionState;
 import com.smartpark.client.realtime.RealtimeClient;
 import com.smartpark.client.realtime.RealtimeEvent;
 import com.smartpark.client.realtime.RealtimeListener;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -38,14 +39,16 @@ import java.util.function.BooleanSupplier;
  *                                                         must get SLOT_RELEASED + VEHICLE_EXITED exactly once
  *         Prints a PASS/FAIL summary.
  *
- * Options: --host H  --port P  --operator U  --terminal T  --clients N (demo, default 3)
+ * Options: --host H  --port P  --clients N (demo, default 3)
+ *          --operator U --password P --terminal T                       (listen; default admin / Admin@123)
+ *          --admin-password, --entry-password, --exit-password           (demo; default = sample passwords)
+ * Every terminal signs in through POST /api/auth/login and uses its bearer token for REST and WebSocket.
  * Run:     mvnw -pl smartpark-client compile exec:java -Dexec.args="demo --clients 5"
  * </pre>
  */
 public final class RealtimeTestClient {
 
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
-    private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final Duration WAIT = Duration.ofSeconds(30);
 
     private RealtimeTestClient() {
@@ -58,9 +61,16 @@ public final class RealtimeTestClient {
         int port = Integer.parseInt(opts.getOrDefault("port", String.valueOf(defaults.serverPort())));
         ClientConfig config = new ClientConfig(host, port, defaults.terminalName());
 
+        passwords.put("admin", opts.getOrDefault("admin-password", "Admin@123"));
+        passwords.put("entry1", opts.getOrDefault("entry-password", "Entry@123"));
+        passwords.put("exit1", opts.getOrDefault("exit-password", "Exit@123"));
+
         switch (opts.getOrDefault("mode", "listen")) {
-            case "listen" -> listen(config, opts.getOrDefault("operator", "admin"),
-                    opts.getOrDefault("terminal", defaults.terminalName()));
+            case "listen" -> {
+                String operator = opts.getOrDefault("operator", "admin");
+                passwords.put(operator, opts.getOrDefault("password", passwords.getOrDefault(operator, "")));
+                listen(config, operator, opts.getOrDefault("terminal", defaults.terminalName()));
+            }
             case "demo" -> demo(config, Integer.parseInt(opts.getOrDefault("clients", "3")));
             default -> throw new IllegalArgumentException("Unknown mode; use 'listen' or 'demo'");
         }
@@ -71,7 +81,11 @@ public final class RealtimeTestClient {
     private static void listen(ClientConfig config, String operator, String terminal) throws Exception {
         print("Connecting to " + config.webSocketUri() + " as " + operator + " (" + terminal + ")");
         print("Press Enter to quit.");
-        try (RealtimeClient client = new RealtimeClient(config.webSocketUri(), operator, terminal)) {
+        String token;
+        try (ApiClient api = new ApiClient(config)) {
+            token = login(api, operator, terminal);
+        }
+        try (RealtimeClient client = new RealtimeClient(config.webSocketUri(), token, operator, terminal)) {
             client.addListener(new PrintingListener(terminal));
             client.connect();
             System.in.read();
@@ -87,29 +101,32 @@ public final class RealtimeTestClient {
 
         List<Terminal> terminals = new ArrayList<>();
         String[][] roles = {{"admin", "ADMIN-DASHBOARD"}, {"entry1", "ENTRY-GATE-1"}, {"exit1", "EXIT-GATE-1"}};
-        for (int i = 0; i < clientCount; i++) {
-            String operator = i < roles.length ? roles[i][0] : "admin";
-            String terminal = i < roles.length ? roles[i][1] : "MONITOR-" + (i - roles.length + 1);
-            terminals.add(new Terminal(new RealtimeClient(ws, operator, terminal)));
-        }
+        Map<String, String> tokens = new HashMap<>();
 
-        try (ServerApiClient api = new ServerApiClient(config)) {
+        try (ApiClient api = new ApiClient(config)) {
+            for (int i = 0; i < clientCount; i++) {
+                String operator = i < roles.length ? roles[i][0] : "admin";
+                String terminal = i < roles.length ? roles[i][1] : "MONITOR-" + (i - roles.length + 1);
+                String token = login(api, operator, terminal);
+                tokens.putIfAbsent(operator, token);
+                terminals.add(new Terminal(new RealtimeClient(ws, token, operator, terminal)));
+            }
+
             terminals.forEach(t -> t.client.connect());
             check("all " + clientCount + " clients connected",
                     waitFor(() -> terminals.stream().allMatch(t -> t.acknowledged)));
 
             // 1. Park a vehicle
             String vehicle = "DEMO" + ThreadLocalRandom.current().nextInt(1000, 10000);
-            HttpResponse<String> slots = api.get("/api/slots/available?category=CAR").join();
-            JsonNode available = JSON.readTree(slots.body());
+            JsonNode available = api.get("/api/slots/available?category=CAR", JsonNode.class).join();
             if (available.isEmpty()) {
                 throw new IllegalStateException("No AVAILABLE slot for CAR - free one and try again");
             }
             String slot = available.get(0).get("slotCode").asString();
             print(">>> REST POST /api/parking/entry  " + vehicle + " -> " + slot + "  (as entry1)");
-            HttpResponse<String> entry = api.post("/api/parking/entry", "entry1",
-                    "{\"vehicleNumber\":\"" + vehicle + "\",\"categoryName\":\"CAR\",\"slotCode\":\"" + slot + "\"}").join();
-            check("entry accepted (HTTP " + entry.statusCode() + ")", entry.statusCode() == 201);
+            ParkingSession entry = api.postAs(tokens.get("entry1"), "/api/parking/entry",
+                    Map.of("vehicleNumber", vehicle, "categoryName", "CAR", "slotCode", slot), ParkingSession.class).join();
+            check("entry accepted (ticket " + entry.ticketId() + ")", "ACTIVE".equals(entry.status()));
             check("every client received SLOT_OCCUPIED + VEHICLE_ENTERED for " + vehicle,
                     waitFor(() -> terminals.stream().allMatch(t -> t.has("SLOT_OCCUPIED", vehicle)
                             && t.has("VEHICLE_ENTERED", vehicle))));
@@ -121,9 +138,10 @@ public final class RealtimeTestClient {
 
             // 3. Release the vehicle while that terminal is offline
             print(">>> REST POST /api/parking/exit   " + vehicle + "  (as exit1)");
-            HttpResponse<String> exit = api.post("/api/parking/exit", "exit1",
-                    "{\"vehicleNumber\":\"" + vehicle + "\"}").join();
-            check("exit accepted (HTTP " + exit.statusCode() + ")", exit.statusCode() == 200);
+            String exitToken = tokens.getOrDefault("exit1", tokens.get("admin"));
+            ParkingSession exit = api.postAs(exitToken, "/api/parking/exit",
+                    Map.of("vehicleNumber", vehicle), ParkingSession.class).join();
+            check("exit accepted (" + exit.durationMinutes() + " min)", "COMPLETED".equals(exit.status()));
             check(victim.client.terminal() + " reconnected",
                     waitFor(() -> victim.client.state() == ConnectionState.CONNECTED && victim.client.stats().reconnects() > 0));
             check("every client received SLOT_RELEASED + VEHICLE_EXITED for " + vehicle,
@@ -224,6 +242,15 @@ public final class RealtimeTestClient {
     // ----------------------------------------------------------------- helpers
 
     private static int failures;
+    private static final Map<String, String> passwords = new HashMap<>();
+
+    /** Signs in through REST and returns the bearer token. */
+    private static String login(ApiClient api, String operator, String terminal) {
+        LoginResponse r = api.postAnonymous("/api/auth/login",
+                new LoginRequest(operator, passwords.getOrDefault(operator, ""), terminal), LoginResponse.class).join();
+        print("Signed in as " + r.user().username() + " (" + r.user().role() + ") for " + terminal);
+        return r.token();
+    }
 
     private static void check(String what, boolean ok) {
         print((ok ? "  [PASS] " : "  [FAIL] ") + what);

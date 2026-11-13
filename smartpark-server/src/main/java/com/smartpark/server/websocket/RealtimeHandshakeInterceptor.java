@@ -1,6 +1,10 @@
 package com.smartpark.server.websocket;
 
 import com.smartpark.server.dto.UserDto;
+import com.smartpark.server.exception.UnauthenticatedException;
+import com.smartpark.server.security.AuthenticatedOperator;
+import com.smartpark.server.security.RequestAuthenticator;
+import org.springframework.http.HttpHeaders;
 import com.smartpark.server.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,12 +24,15 @@ import java.util.UUID;
 /**
  * Checks the WebSocket opening handshake (an HTTP GET with {@code Upgrade: websocket}).
  * <p>
- * Clients identify themselves like the REST API does, with the {@code X-Operator} header
- * (or an {@code operator} query parameter), plus optional query parameters:
+ * Clients authenticate like the REST API does, with {@code Authorization: Bearer <token>}
+ * (or an {@code access_token} query parameter for clients that cannot set headers), plus
+ * optional query parameters:
  * <pre>
- * ws://server:8080/ws?operator=entry1&amp;terminal=ENTRY-GATE-1&amp;clientId=&lt;uuid&gt;&amp;since=42&amp;instance=a1b2c3d4
+ * ws://server:8080/ws?terminal=ENTRY-GATE-1&amp;clientId=&lt;uuid&gt;&amp;since=42&amp;instance=a1b2c3d4
  * </pre>
- * Unknown or inactive operators are refused with HTTP 403, so the connection is never upgraded.
+ * Without a valid token the handshake is refused with HTTP 401, and for an inactive account
+ * with 403, so the connection is never upgraded. (If the development-only operator header mode
+ * is enabled, {@code X-Operator} or {@code ?operator=} is also accepted.)
  */
 @Component
 public class RealtimeHandshakeInterceptor implements HandshakeInterceptor {
@@ -40,23 +47,34 @@ public class RealtimeHandshakeInterceptor implements HandshakeInterceptor {
     private static final Logger log = LoggerFactory.getLogger(RealtimeHandshakeInterceptor.class);
 
     private final UserService userService;
+    private final RequestAuthenticator authenticator;
 
-    public RealtimeHandshakeInterceptor(UserService userService) {
+    public RealtimeHandshakeInterceptor(UserService userService, RequestAuthenticator authenticator) {
         this.userService = userService;
+        this.authenticator = authenticator;
     }
 
     @Override
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                    WebSocketHandler wsHandler, Map<String, Object> attributes) {
         MultiValueMap<String, String> params = UriComponentsBuilder.fromUri(request.getURI()).build().getQueryParams();
-        String operator = Optional.ofNullable(request.getHeaders().getFirst("X-Operator"))
+        String authorization = Optional.ofNullable(request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION))
+                .orElseGet(() -> params.getFirst("access_token") == null ? null : "Bearer " + params.getFirst("access_token"));
+        String operatorHeader = Optional.ofNullable(request.getHeaders().getFirst(RequestAuthenticator.OPERATOR_HEADER))
                 .orElse(params.getFirst("operator"));
 
-        Optional<UserDto> user = operator == null || operator.isBlank()
-                ? Optional.empty() : userService.findByUsername(operator).filter(UserDto::active);
+        AuthenticatedOperator caller;
+        try {
+            caller = authenticator.authenticate(authorization, operatorHeader);
+        } catch (UnauthenticatedException e) {
+            log.warn("Refused WebSocket handshake from {}: {}", request.getRemoteAddress(), e.getMessage());
+            response.setStatusCode(HttpStatus.UNAUTHORIZED);
+            return false;
+        }
+        Optional<UserDto> user = userService.findByUsername(caller.username()).filter(UserDto::active);
         if (user.isEmpty()) {
             log.warn("Refused WebSocket handshake from {}: unknown or inactive operator '{}'",
-                    request.getRemoteAddress(), operator);
+                    request.getRemoteAddress(), caller.username());
             response.setStatusCode(HttpStatus.FORBIDDEN);
             return false;
         }

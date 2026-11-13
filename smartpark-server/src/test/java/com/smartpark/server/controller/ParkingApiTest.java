@@ -34,6 +34,25 @@ class ParkingApiTest extends AbstractApiIntegrationTest {
     }
 
     @Test
+    void entryStoresOptionalOperatorNotes() {
+        Response r = post("/api/parking/entry", ENTRY, """
+                {"vehicleNumber": "NOTE123", "categoryName": "CAR", "slotCode": "A-01",
+                 "notes": "  Scratch on rear bumper  "}""").expect(201);
+        assertThat((String) r.json("$.notes")).isEqualTo("Scratch on rear bumper");
+        assertThat((String) get("/api/parking/sessions/" + r.json("$.ticketId")).json("$.notes"))
+                .isEqualTo("Scratch on rear bumper");
+
+        Response blank = post("/api/parking/entry", ENTRY, """
+                {"vehicleNumber": "NOTE456", "categoryName": "CAR", "slotCode": "A-02", "notes": "   "}""").expect(201);
+        assertThat((Object) blank.json("$.notes")).isNull();
+
+        Response tooLong = post("/api/parking/entry", ENTRY, """
+                {"vehicleNumber": "NOTE789", "categoryName": "CAR", "slotCode": "A-03", "notes": "%s"}"""
+                .formatted("x".repeat(201))).expectProblem(400, "VALIDATION_FAILED");
+        assertThat((List<String>) tooLong.json("$.errors[*].field")).contains("notes");
+    }
+
+    @Test
     void entryRejectsAlreadyParkedVehicle() {
         enter("ABC123", "CAR", "A-01").expect(201);
 
@@ -70,7 +89,7 @@ class ParkingApiTest extends AbstractApiIntegrationTest {
         String body = """
                 {"vehicleNumber": "ABC123", "categoryName": "CAR", "slotCode": "A-01"}""";
         post("/api/parking/entry", EXIT, body).expectProblem(403, "OPERATOR_NOT_AUTHORIZED");
-        post("/api/parking/entry", null, body).expectProblem(400, "MISSING_HEADER");
+        post("/api/parking/entry", null, body).expectProblem(401, "UNAUTHENTICATED");
         post("/api/parking/entry", ADMIN, body).expect(201);
     }
 

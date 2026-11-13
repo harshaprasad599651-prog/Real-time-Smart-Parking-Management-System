@@ -21,13 +21,15 @@ public record ParkingSessionDto(
         String entryOperator,
         String exitOperator,
         @Schema(description = "Length of stay in whole minutes; null while the session is ACTIVE")
-        Long durationMinutes) {
+        Long durationMinutes,
+        @Schema(description = "Optional remark entered by the entry operator")
+        String notes) {
 
     public static ParkingSessionDto from(ParkingSession s) {
         Long duration = s.getEntryTime() != null && s.getExitTime() != null
                 ? Duration.between(s.getEntryTime(), s.getExitTime()).toMinutes() : null;
         return new ParkingSessionDto(s.getId(), s.getTicketId(), s.getVehicleNumber(), s.getVehicleCategory(),
                 s.getParkingSlotCode(), s.getEntryTime(), s.getExitTime(), s.getStatus(),
-                s.getEntryOperator(), s.getExitOperator(), duration);
+                s.getEntryOperator(), s.getExitOperator(), duration, s.getNotes());
     }
 }

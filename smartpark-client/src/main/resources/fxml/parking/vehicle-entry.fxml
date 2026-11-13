@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<!-- Entry Operator dashboard: KPI strip, registration form + selection summary, live parking map, activity. -->
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.smartpark.client.ui.parking.VehicleEntryController" spacing="20">
+
+    <!-- Total / available / occupied / current vehicle -->
+    <FlowPane fx:id="kpis" hgap="16" vgap="16"/>
+
+    <Label fx:id="errorLabel" styleClass="error-banner" wrapText="true" maxWidth="Infinity"/>
+
+    <GridPane hgap="20" vgap="20">
+        <columnConstraints>
+            <ColumnConstraints percentWidth="36"/>
+            <ColumnConstraints percentWidth="64"/>
+        </columnConstraints>
+
+        <!-- ===================== Registration form ===================== -->
+        <VBox spacing="20" GridPane.columnIndex="0">
+            <VBox styleClass="card" spacing="14">
+                <Label text="Register incoming vehicle" styleClass="card-title"/>
+
+                <VBox spacing="6">
+                    <Label text="1. Vehicle registration number" styleClass="field-label"/>
+                    <TextField fx:id="vehicleField" promptText="e.g. WP CAB-1234" styleClass="input, vehicle-input"/>
+                </VBox>
+
+                <VBox spacing="6">
+                    <Label text="2. Vehicle category" styleClass="field-label"/>
+                    <ComboBox fx:id="categoryBox" maxWidth="Infinity" styleClass="input-combo"/>
+                </VBox>
+
+                <VBox spacing="6">
+                    <HBox alignment="CENTER_LEFT">
+                        <Label text="Notes (optional)" styleClass="field-label"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Label fx:id="notesCounter" styleClass="muted"/>
+                    </HBox>
+                    <TextArea fx:id="notesArea" prefRowCount="2" wrapText="true" styleClass="input"
+                              promptText="e.g. scratch on rear bumper, roof rack"/>
+                </VBox>
+
+                <!-- Selection summary: slot code + vehicle details -->
+                <VBox spacing="6">
+                    <Label text="3. Selected slot" styleClass="field-label"/>
+                    <VBox styleClass="selected-slot" spacing="8">
+                        <HBox spacing="14" alignment="CENTER_LEFT">
+                            <Label fx:id="selectedSlotLabel" styleClass="selected-slot-code"/>
+                            <Label fx:id="selectedSlotHint" styleClass="muted" wrapText="true"/>
+                        </HBox>
+                        <GridPane hgap="12" vgap="4">
+                            <columnConstraints>
+                                <ColumnConstraints minWidth="70"/>
+                                <ColumnConstraints hgrow="ALWAYS"/>
+                            </columnConstraints>
+                            <Label text="Vehicle" styleClass="muted" GridPane.rowIndex="0"/>
+                            <Label fx:id="selectedVehicleLabel" styleClass="detail-value" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+                            <Label text="Category" styleClass="muted" GridPane.rowIndex="1"/>
+                            <Label fx:id="selectedCategoryLabel" styleClass="detail-value" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+                        </GridPane>
+                    </VBox>
+                </VBox>
+
+                <Label fx:id="formError" styleClass="error-banner" wrapText="true" maxWidth="Infinity"/>
+                <Label fx:id="connectionHint" styleClass="warning-banner" wrapText="true" maxWidth="Infinity"
+                       text="Waiting for the live connection to the server. Allocation is paused so the map cannot be out of date."/>
+
+                <HBox spacing="10">
+                    <Button fx:id="clearButton" text="Clear" onAction="#onClear" styleClass="secondary-button"/>
+                    <Button fx:id="confirmButton" text="Confirm allocation" onAction="#onConfirm"
+                            styleClass="primary-button" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
+                </HBox>
+
+                <!-- Ticket ID returned by the server for the last allocation -->
+                <VBox fx:id="lastTicketBox" styleClass="ticket-box" spacing="4">
+                    <Label text="LAST TICKET ISSUED" styleClass="ticket-caption"/>
+                    <Label fx:id="lastTicketLabel" styleClass="ticket-id"/>
+                    <Label fx:id="lastTicketDetail" styleClass="ticket-detail" wrapText="true"/>
+                </VBox>
+            </VBox>
+
+            <StackPane fx:id="feedHolder" minHeight="280"/>
+        </VBox>
+
+        <!-- ======================== Live map ========================== -->
+        <VBox styleClass="card" spacing="14" GridPane.columnIndex="1">
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <Label text="Parking map" styleClass="card-title"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="mapSummary" styleClass="map-summary"/>
+            </HBox>
+            <VBox fx:id="legendHolder"/>
+            <StackPane fx:id="mapHolder" alignment="TOP_LEFT"/>
+        </VBox>
+    </GridPane>
+</VBox>

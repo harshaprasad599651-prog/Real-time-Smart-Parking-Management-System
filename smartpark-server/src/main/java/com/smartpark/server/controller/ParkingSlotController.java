@@ -4,6 +4,7 @@ import com.smartpark.server.document.SlotStatus;
 import com.smartpark.server.dto.CreateParkingSlotRequest;
 import com.smartpark.server.dto.ParkingSlotDto;
 import com.smartpark.server.dto.UpdateParkingSlotRequest;
+import com.smartpark.server.security.AuthenticatedOperator;
 import com.smartpark.server.service.ParkingSlotService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -16,7 +17,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -83,8 +83,7 @@ public class ParkingSlotController {
     @ApiErrorResponses.Forbidden
     @ApiErrorResponses.Conflict
     public ResponseEntity<ParkingSlotDto> create(
-            @Parameter(description = "Username of the acting ADMIN", example = "admin")
-            @RequestHeader(OperatorGuard.HEADER) String operator,
+            @Parameter(hidden = true) AuthenticatedOperator operator,
             @Valid @RequestBody CreateParkingSlotRequest request) {
         String admin = operatorGuard.requireAdmin(operator);
         ParkingSlotDto created = slotService.createSlot(request, admin);
@@ -103,8 +102,7 @@ public class ParkingSlotController {
     @ApiErrorResponses.NotFound
     @ApiErrorResponses.Conflict
     public ParkingSlotDto update(
-            @Parameter(description = "Username of the acting ADMIN", example = "admin")
-            @RequestHeader(OperatorGuard.HEADER) String operator,
+            @Parameter(hidden = true) AuthenticatedOperator operator,
             @PathVariable String slotCode,
             @Valid @RequestBody UpdateParkingSlotRequest request) {
         String admin = operatorGuard.requireAdmin(operator);
@@ -119,8 +117,7 @@ public class ParkingSlotController {
     @ApiErrorResponses.NotFound
     @ApiErrorResponses.Conflict
     public ParkingSlotDto disable(
-            @Parameter(description = "Username of the acting ADMIN", example = "admin")
-            @RequestHeader(OperatorGuard.HEADER) String operator,
+            @Parameter(hidden = true) AuthenticatedOperator operator,
             @PathVariable String slotCode) {
         String admin = operatorGuard.requireAdmin(operator);
         return slotService.disableSlot(slotCode, admin);
@@ -133,8 +130,7 @@ public class ParkingSlotController {
     @ApiErrorResponses.NotFound
     @ApiErrorResponses.Conflict
     public ParkingSlotDto enable(
-            @Parameter(description = "Username of the acting ADMIN", example = "admin")
-            @RequestHeader(OperatorGuard.HEADER) String operator,
+            @Parameter(hidden = true) AuthenticatedOperator operator,
             @PathVariable String slotCode) {
         String admin = operatorGuard.requireAdmin(operator);
         return slotService.enableSlot(slotCode, admin);

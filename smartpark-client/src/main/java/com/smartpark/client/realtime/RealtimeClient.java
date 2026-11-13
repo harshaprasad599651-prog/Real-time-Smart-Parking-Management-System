@@ -49,6 +49,7 @@ public final class RealtimeClient implements AutoCloseable {
     private static final Duration MAX_BACKOFF = Duration.ofSeconds(30);
 
     private final URI endpoint;
+    private final String accessToken;
     private final String operator;
     private final String terminal;
     private final String clientId = UUID.randomUUID().toString();
@@ -79,12 +80,14 @@ public final class RealtimeClient implements AutoCloseable {
     }
 
     /**
-     * @param endpoint WebSocket URL, e.g. {@code ws://192.168.1.10:8080/ws}
-     * @param operator username sent in the {@code X-Operator} handshake header
-     * @param terminal terminal name shown to the admin, e.g. {@code ENTRY-GATE-1}
+     * @param endpoint    WebSocket URL, e.g. {@code ws://192.168.1.10:8080/ws}
+     * @param accessToken bearer token from {@code POST /api/auth/login}, sent in the handshake
+     * @param operator    username (for display and logging only; the server trusts the token)
+     * @param terminal    terminal name shown to the admin, e.g. {@code ENTRY-GATE-1}
      */
-    public RealtimeClient(URI endpoint, String operator, String terminal) {
+    public RealtimeClient(URI endpoint, String accessToken, String operator, String terminal) {
         this.endpoint = endpoint;
+        this.accessToken = accessToken;
         this.operator = operator;
         this.terminal = terminal;
     }
@@ -114,10 +117,15 @@ public final class RealtimeClient implements AutoCloseable {
         URI uri = connectUri();
         http.newWebSocketBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
-                .header("X-Operator", operator)
+                .header("Authorization", "Bearer " + accessToken)
                 .buildAsync(uri, new SocketListener())
                 .whenComplete((ws, error) -> {
-                    if (error != null) {
+                    int refused = handshakeStatus(error);
+                    if (refused == 401 || refused == 403) {
+                        // Credentials rejected: retrying cannot help. The application must sign in again.
+                        closed = true;
+                        setState(ConnectionState.UNAUTHORIZED, "server refused the session (HTTP " + refused + ")");
+                    } else if (error != null) {
                         scheduleReconnect("connect failed: " + rootMessage(error));
                     } else if (closed) {
                         ws.abort();
@@ -133,8 +141,7 @@ public final class RealtimeClient implements AutoCloseable {
     private URI connectUri() {
         StringBuilder q = new StringBuilder(endpoint.toString())
                 .append(endpoint.getQuery() == null ? '?' : '&')
-                .append("operator=").append(enc(operator))
-                .append("&terminal=").append(enc(terminal))
+                .append("terminal=").append(enc(terminal))
                 .append("&clientId=").append(clientId);
         if (tracker.serverInstanceId() != null) {
             q.append("&since=").append(tracker.lastSequence())
@@ -339,6 +346,16 @@ public final class RealtimeClient implements AutoCloseable {
             Thread.currentThread().interrupt();
         }
         http.close();
+    }
+
+    /** HTTP status of a refused WebSocket handshake, or -1. */
+    private static int handshakeStatus(Throwable error) {
+        for (Throwable t = error; t != null; t = t.getCause()) {
+            if (t instanceof java.net.http.WebSocketHandshakeException h) {
+                return h.getResponse().statusCode();
+            }
+        }
+        return -1;
     }
 
     private static String rootMessage(Throwable t) {

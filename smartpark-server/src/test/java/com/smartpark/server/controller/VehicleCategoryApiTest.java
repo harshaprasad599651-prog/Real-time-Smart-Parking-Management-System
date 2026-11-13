@@ -65,7 +65,7 @@ class VehicleCategoryApiTest extends AbstractApiIntegrationTest {
     void requiresAnActiveAdmin() {
         String body = """
                 {"categoryName": "BUS", "compatibleSlotTypes": ["LARGE"]}""";
-        post("/api/categories", null, body).expectProblem(400, "MISSING_HEADER");
+        post("/api/categories", null, body).expectProblem(401, "UNAUTHENTICATED");
         post("/api/categories", ENTRY, body).expectProblem(403, "OPERATOR_NOT_AUTHORIZED");
         post("/api/categories", "ghost", body).expectProblem(403, "OPERATOR_NOT_AUTHORIZED");
     }

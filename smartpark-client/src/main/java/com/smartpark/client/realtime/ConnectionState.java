@@ -10,6 +10,8 @@ public enum ConnectionState {
     CONNECTED,
     /** Connection lost; retrying with back-off. Operations should be blocked in the UI. */
     RECONNECTING,
+    /** The server refused our credentials (token expired or revoked). No retries: sign in again. */
+    UNAUTHORIZED,
     /** {@code close()} was called; no more reconnects. */
     CLOSED
 }

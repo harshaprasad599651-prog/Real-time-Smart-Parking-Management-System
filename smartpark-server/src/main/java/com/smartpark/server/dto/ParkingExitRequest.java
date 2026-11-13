@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/** Body of {@code POST /api/parking/exit}. The operator is identified by the {@code X-Operator} header. */
+/** Body of {@code POST /api/parking/exit}. The operator is identified by the bearer token. */
 @Schema(description = "Vehicle whose departure is confirmed")
 public record ParkingExitRequest(
         @NotBlank @Size(max = 20)

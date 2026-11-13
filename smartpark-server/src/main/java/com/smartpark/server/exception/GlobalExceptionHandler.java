@@ -66,6 +66,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case ConcurrentUpdateException x -> { status = HttpStatus.CONFLICT; code = "CONCURRENT_UPDATE"; }
             case SlotNotCompatibleException x -> { status = HttpStatus.UNPROCESSABLE_CONTENT; code = "SLOT_NOT_COMPATIBLE"; }
             case OperatorNotAuthorizedException x -> { status = HttpStatus.FORBIDDEN; code = "OPERATOR_NOT_AUTHORIZED"; }
+            case UnauthenticatedException x -> { status = HttpStatus.UNAUTHORIZED; code = "UNAUTHENTICATED"; }
+            case InvalidCredentialsException x -> { status = HttpStatus.UNAUTHORIZED; code = "INVALID_CREDENTIALS"; }
             default -> { status = HttpStatus.BAD_REQUEST; code = "BUSINESS_RULE_VIOLATION"; }
         }
         return problem(status, code, e.getMessage(), request);

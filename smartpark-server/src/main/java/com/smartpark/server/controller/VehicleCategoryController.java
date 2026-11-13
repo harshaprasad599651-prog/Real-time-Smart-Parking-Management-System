@@ -3,6 +3,7 @@ package com.smartpark.server.controller;
 import com.smartpark.server.dto.CreateVehicleCategoryRequest;
 import com.smartpark.server.dto.UpdateVehicleCategoryRequest;
 import com.smartpark.server.dto.VehicleCategoryDto;
+import com.smartpark.server.security.AuthenticatedOperator;
 import com.smartpark.server.service.VehicleCategoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,7 +16,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -58,8 +58,7 @@ public class VehicleCategoryController {
     @ApiErrorResponses.Forbidden
     @ApiErrorResponses.Conflict
     public ResponseEntity<VehicleCategoryDto> create(
-            @Parameter(description = "Username of the acting ADMIN", example = "admin")
-            @RequestHeader(OperatorGuard.HEADER) String operator,
+            @Parameter(hidden = true) AuthenticatedOperator operator,
             @Valid @RequestBody CreateVehicleCategoryRequest request) {
         String admin = operatorGuard.requireAdmin(operator);
         VehicleCategoryDto created = categoryService.createCategory(request, admin);
@@ -77,8 +76,7 @@ public class VehicleCategoryController {
     @ApiErrorResponses.Forbidden
     @ApiErrorResponses.NotFound
     public VehicleCategoryDto update(
-            @Parameter(description = "Username of the acting ADMIN", example = "admin")
-            @RequestHeader(OperatorGuard.HEADER) String operator,
+            @Parameter(hidden = true) AuthenticatedOperator operator,
             @PathVariable String categoryName,
             @Valid @RequestBody UpdateVehicleCategoryRequest request) {
         String admin = operatorGuard.requireAdmin(operator);

@@ -143,7 +143,8 @@ public class ParkingSessionService {
             String ticketId = ticketIdGenerator.next(now); // outside any transaction: avoids conflicts on the counter
 
             Allocation allocation = transactionRunner.execute(inTransaction ->
-                    allocate(vehicle, category, slotCode, ticketId, now, operator.getUsername(), inTransaction));
+                    allocate(vehicle, category, slotCode, ticketId, now, operator.getUsername(), request.notes(),
+                            inTransaction));
 
             // Committed: tell everyone (WebSocket broadcast happens in ParkingEventRelay).
             ParkingSessionDto session = ParkingSessionDto.from(allocation.session());
@@ -164,7 +165,7 @@ public class ParkingSessionService {
     }
 
     private Allocation allocate(String vehicle, String category, String slotCode, String ticketId,
-                                Instant now, String operator, boolean inTransaction) {
+                                Instant now, String operator, String notes, boolean inTransaction) {
         // Step 1 - atomically claim the slot (matches only if AVAILABLE and compatible).
         Query claimable = query(where(ParkingSlot.F_SLOT_CODE).is(slotCode)
                 .and(ParkingSlot.F_STATUS).is(SlotStatus.AVAILABLE)
@@ -182,7 +183,7 @@ public class ParkingSessionService {
         // Step 2 - create the ACTIVE session. Partial unique indexes are the final safety net.
         try {
             ParkingSession session = mongoTemplate.insert(
-                    ParkingSession.start(ticketId, vehicle, category, slotCode, now, operator));
+                    ParkingSession.start(ticketId, vehicle, category, slotCode, now, operator, notes));
             return new Allocation(session, claimed);
         } catch (DuplicateKeyException e) {
             if (!inTransaction) {

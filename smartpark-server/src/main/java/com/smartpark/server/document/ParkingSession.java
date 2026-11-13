@@ -41,6 +41,8 @@ public class ParkingSession {
     private SessionStatus status;
     private String entryOperator;
     private String exitOperator;
+    /** Optional free-text remark by the entry operator (e.g. "scratch on rear bumper"). */
+    private String notes;
 
     public ParkingSession() {
     }
@@ -55,6 +57,14 @@ public class ParkingSession {
         s.entryTime = entryTime;
         s.status = SessionStatus.ACTIVE;
         s.entryOperator = entryOperator;
+        return s;
+    }
+
+    /** As {@link #start}, with the operator's optional notes (blank becomes null). */
+    public static ParkingSession start(String ticketId, String vehicleNumber, String vehicleCategory,
+                                       String parkingSlotCode, Instant entryTime, String entryOperator, String notes) {
+        ParkingSession s = start(ticketId, vehicleNumber, vehicleCategory, parkingSlotCode, entryTime, entryOperator);
+        s.notes = notes == null || notes.isBlank() ? null : notes.trim();
         return s;
     }
 
@@ -84,6 +94,9 @@ public class ParkingSession {
 
     public String getEntryOperator() { return entryOperator; }
     public void setEntryOperator(String entryOperator) { this.entryOperator = entryOperator; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 
     public String getExitOperator() { return exitOperator; }
     public void setExitOperator(String exitOperator) { this.exitOperator = exitOperator; }
