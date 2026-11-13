@@ -64,12 +64,24 @@
     <build>
         <finalName>smartpark-client</finalName>
         <plugins>
-            <!-- Enables `mvn javafx:run` -->
+            <!--
+                `mvn javafx:run`   runs the client from the sources (development).
+                `mvn javafx:jlink` builds a self-contained client for the Entry/Exit/Admin PCs:
+                    target/smartpark-client-image/      (Java runtime + JavaFX + the client)
+                    target/SmartPark-Client.zip         (the same, zipped for copying)
+                The PCs need no JDK or Maven. See docs/DEPLOYMENT.md.
+            -->
             <plugin>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>
                 <configuration>
                     <mainClass>${client.main.class}</mainClass>
+                    <jlinkImageName>smartpark-client-image</jlinkImageName>
+                    <launcher>smartpark-client</launcher>
+                    <jlinkZipName>SmartPark-Client</jlinkZipName>
+                    <stripDebug>true</stripDebug>
+                    <noHeaderFiles>true</noHeaderFiles>
+                    <noManPages>true</noManPages>
                     <options>
                         <option>-Dsmartpark.server.host=${smartpark.server.host}</option>
                         <option>-Dsmartpark.server.port=${smartpark.server.port}</option>

@@ -101,6 +101,7 @@ Rejected operations (409, 422 ...) broadcast **nothing**. Events are only publis
 4. The server answers `CONNECTION_ACK` and then:
    * same server, missed events still in its 1000-event history: **replays them in order** (`replayedEvents = n`);
    * server restarted, or too many missed events: `resyncRequired = true`, and the client reloads its state with REST `GET`s.
+5. In every case, after a **reconnect** each open screen reloads its data from the server (the single source of truth), even when the missed events were replayed. Sign-ins are stored in MongoDB, so a server restart does not send the operators back to the login screen.
 
 ---
 

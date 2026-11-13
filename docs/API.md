@@ -28,7 +28,7 @@ Ready-made requests: [`smartpark-server/http/smartpark-api.http`](../smartpark-s
 3. **Check it:** `GET /api/auth/me` returns the current user, or 401 if the token is no longer valid.
 4. **Sign out:** `POST /api/auth/logout` returns **204** and revokes the token immediately.
 
-Tokens are random 256-bit values. The server keeps only their SHA-256 hashes, in memory: restarting the server signs everyone out. Deactivating an account revokes all its tokens.
+Tokens are random 256-bit values. The server keeps only their SHA-256 hashes, in memory and in the `loginSessions` collection, so a **server restart does not sign the terminals out**: they reconnect by themselves. A TTL index deletes expired sign-ins. Deactivating an account or changing its role revokes all its tokens.
 
 ### Role-based access control (enforced on the server)
 

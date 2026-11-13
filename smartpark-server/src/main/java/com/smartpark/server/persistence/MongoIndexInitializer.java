@@ -1,6 +1,7 @@
 package com.smartpark.server.persistence;
 
 import com.smartpark.server.document.ActivityLog;
+import com.smartpark.server.document.LoginSession;
 import com.smartpark.server.document.ParkingSession;
 import com.smartpark.server.document.ParkingSlot;
 import com.smartpark.server.document.SessionStatus;
@@ -97,6 +98,13 @@ public class MongoIndexInitializer implements InitializingBean {
                 .on(ActivityLog.F_USERNAME, Direction.ASC)
                 .on(ActivityLog.F_TIMESTAMP, Direction.DESC)
                 .named(IndexNames.ACTIVITY_USER_TIMESTAMP));
+
+        // loginSessions (sign-ins survive a server restart; expired ones are removed by MongoDB)
+        IndexOperations logins = ops(LoginSession.class);
+        logins.createIndex(new Index().on(LoginSession.F_EXPIRES_AT, Direction.ASC)
+                .expire(java.time.Duration.ZERO).named(IndexNames.LOGIN_SESSIONS_EXPIRY));
+        logins.createIndex(new Index().on(LoginSession.F_USERNAME, Direction.ASC)
+                .named(IndexNames.LOGIN_SESSIONS_USERNAME));
 
         log.info("MongoDB indexes verified on database '{}'", mongoTemplate.getDb().getName());
     }

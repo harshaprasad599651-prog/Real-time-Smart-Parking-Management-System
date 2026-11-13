@@ -1,8 +1,14 @@
 # Copy this file to `application-local.properties` (same folder) and adjust.
 # `application-local.properties` is git-ignored, so nothing here gets committed.
 
-# Only needed if MongoDB has authentication enabled or runs elsewhere on the LAN:
-# spring.mongodb.uri=mongodb://smartpark:change-me@localhost:27017/?authSource=admin
+# MongoDB with authentication (deployment). The `smartpark` account is created by
+# deploy/server/mongodb/create-smartpark-user.js and may only read/write smartpark_db.
+# URL-encode special characters in the password (@ -> %40, : -> %3A, / -> %2F, % -> %25).
+# spring.mongodb.uri=mongodb://smartpark:change-me@127.0.0.1:27017/smartpark_db?authSource=smartpark_db
+# spring.mongodb.database=smartpark_db
+
+# Listen only on the Admin PC's LAN address instead of all interfaces (optional):
+# server.address=192.168.1.10
 
 # Passwords for the sample accounts created on first start:
 # smartpark.seed.admin-password=change-me

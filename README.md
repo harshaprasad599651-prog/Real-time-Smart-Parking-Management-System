@@ -10,9 +10,9 @@ University **Network Programming** project. Three computers on the same LAN/Wi-F
 
 Clients send commands to the server through a **REST API (HTTP/JSON)** and receive real-time updates through a **WebSocket** (`ws://<server>:8080/ws`). **Only the server connects to MongoDB.** The Entry and Exit clients never talk to the database directly.
 
-> **Current stage:** receipt printing. Entry operators register a vehicle (with optional notes), pick a compatible free slot on a live graphical parking map, confirm, and get the ticket with a receipt preview that prints on thermal (80/58 mm) or standard printers through the JavaFX printing API; any receipt can be reprinted by ticket ID. Exit operators search a vehicle, review its active session, and confirm the exit. The server completes it transactionally, and every terminal sees the slot become free at once. Admins have a full management dashboard: live KPIs and charts, a live map showing which vehicle is in each slot, parked vehicles, searchable parking history, slot management, operator account management and live operator activity. Role-based access control is enforced on the server for every endpoint.
+> **Current stage:** LAN deployment ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): packages for the three Windows PCs, firewall, secure MongoDB, reconnection). Entry operators register a vehicle (with optional notes), pick a compatible free slot on a live graphical parking map, confirm, and get the ticket with a receipt preview that prints on thermal (80/58 mm) or standard printers through the JavaFX printing API; any receipt can be reprinted by ticket ID. Exit operators search a vehicle, review its active session, and confirm the exit. The server completes it transactionally, and every terminal sees the slot become free at once. Admins have a full management dashboard: live KPIs and charts, a live map showing which vehicle is in each slot, parked vehicles, searchable parking history, slot management, operator account management and live operator activity. Role-based access control is enforced on the server for every endpoint.
 >
-> **Documentation:** [docs/API.md](docs/API.md) (REST) · [docs/REALTIME.md](docs/REALTIME.md) (WebSocket, REST vs WebSocket, test client) · Swagger UI at `http://localhost:8080/swagger-ui.html` while the server runs · sample requests in [smartpark-server/http/smartpark-api.http](smartpark-server/http/smartpark-api.http)
+> **Documentation:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) (three-PC Windows deployment) · [docs/API.md](docs/API.md) (REST) · [docs/REALTIME.md](docs/REALTIME.md) (WebSocket, REST vs WebSocket, test client) · Swagger UI at `http://localhost:8080/swagger-ui.html` while the server runs · sample requests in [smartpark-server/http/smartpark-api.http](smartpark-server/http/smartpark-api.http)
 
 ---
 
@@ -127,7 +127,7 @@ Follow <https://www.mongodb.com/docs/manual/administration/install-community/>, 
 ### Security notes
 
 - The installer binds MongoDB to `127.0.0.1` (`bindIp` in `mongod.cfg`). **Keep it that way.** Only the SmartPark server, on the same PC, needs it. Do **not** open port 27017 in the firewall.
-- A default local install has no username/password. If you enable authentication, put the credentials in the URI (see §2).
+- A default local install has no username/password. For deployment, enable authentication and keep MongoDB on 127.0.0.1 as described in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#31-mongodb-secure-local-database).
 
 ### Optional: enable multi-document transactions
 
@@ -165,6 +165,7 @@ Defaults are in `smartpark-server/src/main/resources/application.properties`. Ea
 | `SMARTPARK_SEED_ENTRY_PASSWORD` | `Entry@123` | Password of the sample `entry1` account |
 | `SMARTPARK_SEED_EXIT_PASSWORD` | `Exit@123` | Password of the sample `exit1` account |
 | `SMARTPARK_SERVER_PORT` | `8080` | HTTP/WebSocket port |
+| `SMARTPARK_SERVER_ADDRESS` | `0.0.0.0` | Network interface to listen on (`0.0.0.0` = all; or the Admin PC's LAN IP) |
 
 PowerShell example:
 
@@ -268,7 +269,7 @@ The login screen opens and shows whether the server is reachable. Sign in with o
 | `entry1` | `Entry@123` | Vehicle Entry | Vehicle Entry |
 | `exit1` | `Exit@123` | Vehicle Exit | Vehicle Exit |
 
-The top bar shows the live connection to the server (green **Live**, amber **Reconnecting...**, red **Offline**). If the session ends, because the token expired, the server restarted or the account was deactivated, the client returns to the login screen with a message. See [docs/CLIENT.md](docs/CLIENT.md) for how the client is built.
+The top bar shows the live connection to the server (green **Live**, amber **Reconnecting...**, red **Offline**). If the network or the server goes away, the client reconnects by itself and reloads its data; sign-ins survive a server restart. If the session ends (token expired, account deactivated or role changed), the client returns to the login screen with a message. See [docs/CLIENT.md](docs/CLIENT.md) for how the client is built.
 
 ### Pointing a client at the Admin PC
 

@@ -23,6 +23,9 @@ public final class IndexNames {
 
     public static final String ACTIVITY_TIMESTAMP = "ix_activity_timestamp";
     public static final String ACTIVITY_USER_TIMESTAMP = "ix_activity_user_timestamp";
+    /** TTL: MongoDB deletes a login session once its expiry time has passed. */
+    public static final String LOGIN_SESSIONS_EXPIRY = "ttl_login_sessions_expires";
+    public static final String LOGIN_SESSIONS_USERNAME = "ix_login_sessions_username";
 
     private IndexNames() {
     }

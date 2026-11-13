@@ -44,7 +44,7 @@ When the session ends, the app returns to the login screen with an explanation:
 | Cause | Detected by | Message |
 |---|---|---|
 | Operator clicks **Sign out** or closes the window | `SessionManager.logout()` (token revoked on the server) | "You have signed out." |
-| Token expired or revoked, server restarted | any REST call → 401, **or** WebSocket handshake → 401 | "Your session has expired or was ended by the server." |
+| Token expired or revoked (logout elsewhere, account deactivated, role changed) | any REST call → 401, **or** WebSocket handshake → 401 | "Your session has expired or was ended by the server." |
 
 ## Role protection: two layers
 

@@ -67,10 +67,22 @@ public final class RealtimeService {
                 });
             }
 
+            private boolean connectedBefore;
+
             @Override
             public void onConnected(ConnectionAck ack) {
-                Platform.runLater(() -> detail.set("Connected to " + config.serverHost() + ":" + config.serverPort()
-                        + (ack.replayedEvents() > 0 ? " (" + ack.replayedEvents() + " missed updates recovered)" : "")));
+                boolean reconnected = connectedBefore;
+                connectedBefore = true;
+                Platform.runLater(() -> {
+                    detail.set("Connected to " + config.serverHost() + ":" + config.serverPort()
+                            + (ack.replayedEvents() > 0 ? " (" + ack.replayedEvents() + " missed updates recovered)" : ""));
+                    // After any reconnect (network drop, server restart) every open screen reloads its
+                    // data from the server, the single source of truth. A required resync is announced
+                    // separately by onResyncRequired, so it is not triggered twice.
+                    if (reconnected && !ack.resyncRequired()) {
+                        resyncHandlers.forEach(h -> h.accept("reconnected"));
+                    }
+                });
             }
 
             @Override
