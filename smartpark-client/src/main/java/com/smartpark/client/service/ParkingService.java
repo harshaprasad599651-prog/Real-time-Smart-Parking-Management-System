@@ -6,6 +6,8 @@ import com.smartpark.client.net.dto.ApiDtos.EntryRequest;
 import com.smartpark.client.net.dto.ApiDtos.ExitLookup;
 import com.smartpark.client.net.dto.ApiDtos.ExitRequest;
 import com.smartpark.client.net.dto.ApiDtos.ParkingSession;
+import com.smartpark.client.net.dto.ApiDtos.ReceiptInfo;
+import com.smartpark.client.net.dto.ApiDtos.RecordPrintRequest;
 import com.smartpark.client.net.dto.ApiDtos.SessionPage;
 import com.smartpark.client.net.dto.ApiDtos.SlotInfo;
 import com.smartpark.client.realtime.RealtimeEvent;
@@ -55,6 +57,22 @@ public final class ParkingService {
      */
     public CompletableFuture<ParkingSession> registerEntry(EntryRequest request) {
         return api.post("/api/parking/entry", request, ParkingSession.class);
+    }
+
+    // ------------------------------------------------------------ receipts
+
+    /**
+     * {@code GET /api/parking/receipts/{ticketId}}: the ticket stored on the server, for a reprint.
+     * Read-only: it never creates a parking session. 404 NOT_FOUND for an unknown ticket.
+     */
+    public CompletableFuture<ReceiptInfo> receipt(String ticketId) {
+        return api.get("/api/parking/receipts/" + enc(ticketId.trim()), ReceiptInfo.class);
+    }
+
+    /** {@code POST /api/parking/receipts/{ticketId}/prints}: tells the server the receipt was printed. */
+    public CompletableFuture<ReceiptInfo> recordPrint(String ticketId, String printerName) {
+        return api.post("/api/parking/receipts/" + enc(ticketId) + "/prints", new RecordPrintRequest(printerName),
+                ReceiptInfo.class);
     }
 
     // --------------------------------------------------------------- exit

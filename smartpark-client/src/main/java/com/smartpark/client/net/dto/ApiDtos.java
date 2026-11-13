@@ -81,6 +81,17 @@ public final class ApiDtos {
     public record EntryRequest(String vehicleNumber, String categoryName, String slotCode, String notes) {
     }
 
+    /** {@code GET /api/parking/receipts/{ticketId}}: the stored ticket used to print or reprint a receipt. */
+    public record ReceiptInfo(String ticketId, String vehicleNumber, String vehicleCategory, String parkingSlotCode,
+                              String slotType, int floor, String row, int column, Instant entryTime,
+                              String entryOperator, String sessionStatus, int printCount,
+                              Instant lastPrintedAt, String lastPrintedBy) {
+    }
+
+    /** Body of {@code POST /api/parking/receipts/{ticketId}/prints}. */
+    public record RecordPrintRequest(String printerName) {
+    }
+
     public record ExitRequest(String vehicleNumber) {
     }
 

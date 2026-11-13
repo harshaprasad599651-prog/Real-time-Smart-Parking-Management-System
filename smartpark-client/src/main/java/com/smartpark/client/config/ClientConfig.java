@@ -28,6 +28,27 @@ public record ClientConfig(String serverHost, int serverPort, String terminalNam
     private static final String KEY_TERMINAL = "smartpark.terminal.name";
 
     public static ClientConfig load() {
+        Properties props = loadProperties();
+
+        String host = props.getProperty(KEY_HOST, "localhost").trim();
+        String portText = props.getProperty(KEY_PORT, "8080").trim();
+        String terminal = props.getProperty(KEY_TERMINAL, "UNNAMED-TERMINAL").trim();
+
+        int port;
+        try {
+            port = Integer.parseInt(portText);
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException("Invalid " + KEY_PORT + ": " + portText, e);
+        }
+        return new ClientConfig(host, port, terminal);
+    }
+
+    /**
+     * All client settings merged in the documented order (built-in file, then the file in the
+     * working directory, then {@code -Dsmartpark.*} JVM options). Other parts of the client, such
+     * as the printer settings, read their own keys from here.
+     */
+    public static Properties loadProperties() {
         Properties props = new Properties();
 
         try (InputStream in = ClientConfig.class.getResourceAsStream("/" + FILE_NAME)) {
@@ -47,24 +68,13 @@ public record ClientConfig(String serverHost, int serverPort, String terminalNam
             }
         }
 
-        for (String key : new String[]{KEY_HOST, KEY_PORT, KEY_TERMINAL}) {
+        for (String key : System.getProperties().stringPropertyNames()) {
             String override = System.getProperty(key);
-            if (override != null && !override.isBlank()) {
+            if (key.startsWith("smartpark.") && override != null && !override.isBlank()) {
                 props.setProperty(key, override);
             }
         }
-
-        String host = props.getProperty(KEY_HOST, "localhost").trim();
-        String portText = props.getProperty(KEY_PORT, "8080").trim();
-        String terminal = props.getProperty(KEY_TERMINAL, "UNNAMED-TERMINAL").trim();
-
-        int port;
-        try {
-            port = Integer.parseInt(portText);
-        } catch (NumberFormatException e) {
-            throw new IllegalStateException("Invalid " + KEY_PORT + ": " + portText, e);
-        }
-        return new ClientConfig(host, port, terminal);
+        return props;
     }
 
     /** Base URL for REST calls, e.g. {@code http://192.168.1.10:8080}. */

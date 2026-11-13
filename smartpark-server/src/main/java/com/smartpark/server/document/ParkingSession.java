@@ -29,6 +29,7 @@ public class ParkingSession {
     public static final String F_ENTRY_TIME = "entryTime";
     public static final String F_EXIT_TIME = "exitTime";
     public static final String F_EXIT_OPERATOR = "exitOperator";
+    public static final String F_RECEIPT = "receipt";
 
     @Id
     private String id;
@@ -43,6 +44,8 @@ public class ParkingSession {
     private String exitOperator;
     /** Optional free-text remark by the entry operator (e.g. "scratch on rear bumper"). */
     private String notes;
+    /** Ticket and receipt information (slot position at issue time, print history). */
+    private TicketReceipt receipt;
 
     public ParkingSession() {
     }
@@ -97,6 +100,9 @@ public class ParkingSession {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public TicketReceipt getReceipt() { return receipt; }
+    public void setReceipt(TicketReceipt receipt) { this.receipt = receipt; }
 
     public String getExitOperator() { return exitOperator; }
     public void setExitOperator(String exitOperator) { this.exitOperator = exitOperator; }

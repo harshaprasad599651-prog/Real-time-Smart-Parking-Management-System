@@ -100,7 +100,8 @@ All admin screens are **live**: they load over REST, then react to WebSocket eve
 | Select slot | The summary shows the slot code and location plus the vehicle number and category; the *Current vehicle* KPI updates as you type |
 | Confirm allocation | `ConfirmDialog` (reusable component) lists slot, location, vehicle, category, terminal and notes. If a live event takes the slot while the dialog is open, the request is not sent |
 | Server decision | `POST /api/parking/entry` (via `ParkingService.registerEntry`). **The server is the only authority:** 201 shows the ticket ID in *Last ticket issued*, marks the slot occupied and prepares the receipt; 409 `SLOT_UNAVAILABLE` tells the operator and reloads the map |
-| Receipt | `ReceiptDialog` shows the prepared receipt (ticket, vehicle, category, slot, location, server entry date and time, operator, terminal). Physical printing is a later stage; `ReceiptView` is a self-contained node ready for `PrinterJob` |
+| Receipt | After a **201** only, `ReceiptDialog` opens the receipt preview with printer and paper choice; see *Receipt printing* below |
+| Reprint | The *Reprint receipt* card takes a ticket ID, loads the stored ticket (`GET /api/parking/receipts/{id}`) and opens the same preview, marked as a duplicate. It never creates a session |
 | Real time | `SLOT_RELEASED` from an exit gate turns the tile green immediately and updates the KPIs, with no reload. Allocation is disabled while the live connection is down |
 
 *Race detail:* the server broadcasts `SLOT_OCCUPIED` before the HTTP response reaches the entry terminal. While its own request is in flight, the entry screen therefore ignores "your selected slot was taken" notifications. A genuine conflict always comes back as a 409.
@@ -141,6 +142,30 @@ All admin screens are **live**: they load over REST, then react to WebSocket eve
 * Icons are vector `SVGPath`s (Material Design paths), coloured by CSS; there are no image files.
 * Layouts adapt to the window: the window opens at 90 % of the screen (min 1024×640), KPI tiles wrap (`FlowPane`), two-column areas use percentage columns, and content scrolls vertically.
 
+## Receipt printing (`com.smartpark.client.print`)
+
+| Part | Role |
+|---|---|
+| `ReceiptData` | The receipt's data, built **only** from a server answer: the 201 entry response, or the stored ticket for a reprint. A rejected allocation can never produce a receipt |
+| `ReceiptTemplate` | All text: title, header lines, field order and labels, date/time patterns, footer, duplicate marker. Built-in [`receipt-template.properties`](../smartpark-client/src/main/resources/receipt-template.properties); copy it next to the client on a PC to customise that PC's receipts (no rebuild, read each time the preview opens) |
+| `ReceiptView` | The layout as a JavaFX node, black on white with inline styles. The **same node** is shown in the preview and printed, so the preview is exact |
+| `PaperSize` | `THERMAL_80MM` (72 mm printable), `THERMAL_58MM` (48 mm), `STANDARD` (A4/Letter, receipt centred at the top) and `AUTO`, which picks one from the printer's paper width. Thermal sizes get their own layout width and font scale instead of a shrunk A4 layout |
+| `ReceiptPrinter` | Printing with `javafx.print.PrinterJob`: chooses the printer's matching roll paper when the driver offers it, scales to the printable area, and turns every problem into a `PrintFailure` with a clear message |
+| `PrintSettings` | This PC's default printer and paper (`smartpark.printer.name`, `smartpark.printer.paper` in `smartpark-client.properties`) |
+
+Flow: preview → choose printer and paper → **Print**. Only after the printer accepted the job does the client call `POST /api/parking/receipts/{id}/prints`; the server counts the print and logs `RECEIPT_PRINTED` (first) or `RECEIPT_REPRINTED`. Later prints show *DUPLICATE - REPRINT #n*. Print is disabled while a job is running, so one click is one receipt.
+
+Printer errors (shown in the dialog; the operator can switch printer and retry, and the parking session is never affected):
+
+| Situation | Message |
+|---|---|
+| No printer installed | warning on open, Print disabled |
+| Chosen printer removed | "no longer available, choose another printer" |
+| Printer offline / not accepting jobs (as reported by Windows through `javax.print`) | "offline or not accepting print jobs" |
+| Job rejected, cancelled or failing in the driver | "did not accept the receipt" / "printing failed" |
+
+A queue paused by hand in Windows still reports itself as accepting jobs; Windows holds the receipt and prints it when the queue is resumed.
+
 ## Tests
 
 | Test | What it proves |
@@ -148,7 +173,7 @@ All admin screens are **live**: they load over REST, then react to WebSocket eve
 | `AccessPolicyTest` | Each role's home screen and sidebar; operators cannot open other roles' screens |
 | `SlotMapModelTest` | Layout order, compatible-free-only selection, toggle, category change, live event taking the selected slot, release, server availability is authoritative, highlight |
 | `ExitMessagesTest` | Never parked vs already completed (when, by whom), which errors make an exit outcome unknown, search and rejection messages |
-| `ReceiptAndValidationTest` | Receipt lines (server entry time in local zone) and vehicle-number validation |
+| `ReceiptAndValidationTest` | Receipt lines (server entry time in local zone), reprint from the stored ticket, template customisation (fields, labels, formats, bad pattern fallback), paper-size detection, vehicle-number validation |
 | `ApiClientErrorParsingTest` | Problem+json, non-JSON errors and unreachable server become clear `ApiException`s |
 | `EventSequenceTrackerTest` | Duplicate / gap / server-restart handling of real-time events |
 | `BackendIntegrationTest` | Against a running server: all roles sign in, wrong password, token revoked → `EXPIRED`, authenticated REST + WebSocket, revoked token → WebSocket `UNAUTHORIZED` (no retry loop). Skipped if no server is running |

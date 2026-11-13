@@ -36,7 +36,6 @@ import javafx.scene.layout.VBox;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -85,6 +84,10 @@ public class VehicleEntryController extends LiveView {
     @FXML private VBox lastTicketBox;
     @FXML private Label lastTicketLabel;
     @FXML private Label lastTicketDetail;
+    // reprint
+    @FXML private TextField reprintField;
+    @FXML private Button reprintButton;
+    @FXML private Label reprintError;
     // map + feed
     @FXML private Label errorLabel;
     @FXML private Label mapSummary;
@@ -116,6 +119,11 @@ public class VehicleEntryController extends LiveView {
         feedHolder.getChildren().add(feed);
         hide(errorLabel);
         hide(formError);
+        hide(reprintError);
+        reprintField.setTextFormatter(new TextFormatter<String>(change -> {   // ticket IDs are upper case
+            change.setText(change.getText().toUpperCase(Locale.ROOT));
+            return change.getControlNewText().length() <= 30 ? change : null;
+        }));
         lastTicketBox.setVisible(false);
         lastTicketBox.setManaged(false);
 
@@ -297,10 +305,49 @@ public class VehicleEntryController extends LiveView {
 
         vehicleField.clear();
         notesArea.clear();
-        ReceiptDialog.show(vehicleField.getScene().getWindow(),
-                ReceiptData.of(session, slot, context.config().terminalName()),
-                Objects.requireNonNull(getClass().getResource("/css/smartpark.css")).toExternalForm(),
+        // Only a successful (201) allocation reaches this point, so only it produces a receipt.
+        ReceiptDialog.show(vehicleField.getScene().getWindow(), context, ReceiptData.of(session, slot), 0, false,
                 this::readyForNextVehicle);
+    }
+
+    /**
+     * Reprint by ticket ID: fetches the ticket stored on the server ({@code GET /api/parking/receipts/{id}})
+     * and opens the preview. Read-only on the server: no parking session is created.
+     */
+    @FXML
+    private void onReprint() {
+        String ticket = reprintField.getText() == null ? "" : reprintField.getText().trim();
+        if (ticket.isEmpty()) {
+            showReprintError("Enter the ticket ID to reprint.");
+            reprintField.requestFocus();
+            return;
+        }
+        hide(reprintError);
+        reprintButton.setDisable(true);
+        parking.receipt(ticket).whenComplete((receipt, error) -> Platform.runLater(() -> {
+            reprintButton.setDisable(false);
+            if (error == null) {
+                reprintField.clear();
+                ReceiptDialog.show(reprintField.getScene().getWindow(), context, ReceiptData.of(receipt),
+                        receipt.printCount(), true, () -> reprintField.requestFocus());
+                return;
+            }
+            ApiException e = ApiClient.unwrap(error);
+            if (e.isUnauthorized()) {
+                return; // handled globally (back to login)
+            }
+            showReprintError(switch (e.code()) {
+                case "NOT_FOUND" -> "No ticket " + ticket + " was found. Check the ticket ID.";
+                case ApiException.SERVER_UNREACHABLE -> "The server cannot be reached. Try again in a moment.";
+                default -> e.userMessage();
+            });
+        }));
+    }
+
+    private void showReprintError(String message) {
+        reprintError.setText(message);
+        reprintError.setVisible(true);
+        reprintError.setManaged(true);
     }
 
     /** After the receipt closes: scroll back to the top and put the cursor in the vehicle field. */

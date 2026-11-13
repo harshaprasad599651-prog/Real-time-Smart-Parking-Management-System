@@ -4,6 +4,7 @@ import com.smartpark.server.document.ActivityAction;
 import com.smartpark.server.document.ParkingSession;
 import com.smartpark.server.document.ParkingSlot;
 import com.smartpark.server.document.SessionStatus;
+import com.smartpark.server.document.TicketReceipt;
 import com.smartpark.server.document.SlotStatus;
 import com.smartpark.server.document.User;
 import com.smartpark.server.document.UserRole;
@@ -182,8 +183,11 @@ public class ParkingSessionService {
 
         // Step 2 - create the ACTIVE session. Partial unique indexes are the final safety net.
         try {
-            ParkingSession session = mongoTemplate.insert(
-                    ParkingSession.start(ticketId, vehicle, category, slotCode, now, operator, notes));
+            // The ticket (receipt) information is part of the same insert: it exists only for a
+            // successful allocation.
+            ParkingSession toInsert = ParkingSession.start(ticketId, vehicle, category, slotCode, now, operator, notes);
+            toInsert.setReceipt(TicketReceipt.issuedFor(claimed));
+            ParkingSession session = mongoTemplate.insert(toInsert);
             return new Allocation(session, claimed);
         } catch (DuplicateKeyException e) {
             if (!inTransaction) {

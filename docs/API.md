@@ -39,7 +39,7 @@ Every `/api/**` request passes through `RoleCheckInterceptor`. Each controller m
 | `POST /api/auth/login`, `GET /api/health` | public (no token) |
 | User management (`/api/users/**`), activity log, connected terminals | `ADMIN` |
 | Category and slot changes (POST/PUT, disable/enable) | `ADMIN` |
-| Vehicle entry | `ENTRY_OPERATOR`, `ADMIN` |
+| Vehicle entry, receipts (`/api/parking/receipts/**`) | `ENTRY_OPERATOR`, `ADMIN` |
 | Vehicle exit, exit search (`/api/parking/active/{v}`), history search (`/api/parking/sessions`) | `EXIT_OPERATOR`, `ADMIN` |
 | Every other `GET` (slots, categories, active sessions, one session, statistics) | any signed-in user |
 
@@ -153,11 +153,30 @@ Vehicle numbers are normalized: case, spaces and hyphens are ignored, so `wp cab
 |---|---|---|
 | GET | `/api/parking/sessions/active` | All parked vehicles (ACTIVE sessions), newest first |
 | GET | `/api/parking/sessions?vehicleNumber=&status=&slotCode=&from=&to=&page=0&size=20` | History, newest first, paged. `from`/`to` filter on entry time (ISO-8601; `from` inclusive, `to` exclusive). `size` 1-200 |
-| GET | `/api/parking/sessions/{ticketId}` | One session (receipt reprint) |
+| GET | `/api/parking/sessions/{ticketId}` | One session |
 | GET | `/api/statistics` | Occupancy and traffic statistics |
 | GET | `/api/activity?username=&role=&action=&limit=50` | Operator activity log, newest first (ADMIN). Optional filters: user, role (`ENTRY_OPERATOR` ...), action (`VEHICLE_ENTRY`, `LOGIN_SUCCESS` ...); limit 1-500 |
 | GET | `/api/health` | Server status and server time |
 | GET | `/api/realtime/status` | Clients connected to the WebSocket (operator, role, terminal, address, last heartbeat) |
+
+### Receipts (ENTRY_OPERATOR, ADMIN)
+
+Ticket information is stored **with the session, in the same insert**: an embedded `receipt` sub-document holds the slot's position at issue time and the print history (`printCount`, `firstPrintedAt`, `lastPrintedAt`, `lastPrintedBy`, `lastPrinter`). A rejected entry therefore has neither a session nor a ticket.
+
+| Method | Path | Description | Success |
+|---|---|---|---|
+| GET | `/api/parking/receipts/{ticketId}` | The stored ticket for printing or reprinting (ticket ID is case-insensitive). Read-only | 200 |
+| POST | `/api/parking/receipts/{ticketId}/prints` | Record a print after the printer accepted it. Body optional: `{ "printerName": "..." }`. Increments `printCount`; never creates a session | 200 |
+
+```jsonc
+// GET /api/parking/receipts/SP-20261113-000008
+{ "ticketId": "SP-20261113-000008", "vehicleNumber": "WPPRN4455", "vehicleCategory": "ELECTRIC_CAR",
+  "parkingSlotCode": "B-05", "slotType": "EV_CHARGING", "floor": 0, "row": "B", "column": 5,
+  "entryTime": "2026-11-13T10:20:56Z", "entryOperator": "entry1", "sessionStatus": "ACTIVE",
+  "printCount": 1, "lastPrintedAt": "2026-11-13T10:21:30Z", "lastPrintedBy": "entry1" }
+```
+
+Unknown ticket: **404** `NOT_FOUND`. The activity log gets `RECEIPT_PRINTED` for the first print and `RECEIPT_REPRINTED` (with the copy number) for every later one. Receipts can be reprinted after the vehicle left (`sessionStatus` COMPLETED).
 
 ### User management (ADMIN)
 

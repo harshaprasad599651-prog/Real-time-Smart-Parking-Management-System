@@ -92,6 +92,19 @@
                 </VBox>
             </VBox>
 
+            <!-- Reprint an existing ticket's receipt (never creates a parking session) -->
+            <VBox styleClass="card" spacing="10">
+                <Label text="Reprint receipt" styleClass="card-title"/>
+                <Label text="Enter the ticket ID printed on the receipt, e.g. SP-20261113-000007." styleClass="muted" wrapText="true"/>
+                <HBox spacing="10">
+                    <TextField fx:id="reprintField" promptText="Ticket ID" styleClass="input" HBox.hgrow="ALWAYS"
+                               onAction="#onReprint"/>
+                    <Button fx:id="reprintButton" text="Find receipt" onAction="#onReprint" styleClass="secondary-button"
+                            minWidth="-Infinity"/>
+                </HBox>
+                <Label fx:id="reprintError" styleClass="error-banner" wrapText="true" maxWidth="Infinity"/>
+            </VBox>
+
             <StackPane fx:id="feedHolder" minHeight="280"/>
         </VBox>
 

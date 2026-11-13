@@ -10,6 +10,7 @@ module com.smartpark.client {
     requires java.net.http;            // Java HTTP Client + WebSocket (built into the JDK)
     requires tools.jackson.databind;   // JSON
     requires java.logging;
+    requires java.desktop;             // javax.print: asks Windows whether a printer is offline
 
     // JavaFX launcher must be able to instantiate the Application subclass
     exports com.smartpark.client.app;

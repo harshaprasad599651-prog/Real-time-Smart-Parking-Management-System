@@ -10,7 +10,7 @@ University **Network Programming** project. Three computers on the same LAN/Wi-F
 
 Clients send commands to the server through a **REST API (HTTP/JSON)** and receive real-time updates through a **WebSocket** (`ws://<server>:8080/ws`). **Only the server connects to MongoDB.** The Entry and Exit clients never talk to the database directly.
 
-> **Current stage:** admin dashboard. Entry operators register a vehicle (with optional notes), pick a compatible free slot on a live graphical parking map, confirm, and get the ticket with a prepared receipt (physical printing comes later). Exit operators search a vehicle, review its active session, and confirm the exit. The server completes it transactionally, and every terminal sees the slot become free at once. Admins have a full management dashboard: live KPIs and charts, a live map showing which vehicle is in each slot, parked vehicles, searchable parking history, slot management, operator account management and live operator activity. Role-based access control is enforced on the server for every endpoint.
+> **Current stage:** receipt printing. Entry operators register a vehicle (with optional notes), pick a compatible free slot on a live graphical parking map, confirm, and get the ticket with a receipt preview that prints on thermal (80/58 mm) or standard printers through the JavaFX printing API; any receipt can be reprinted by ticket ID. Exit operators search a vehicle, review its active session, and confirm the exit. The server completes it transactionally, and every terminal sees the slot become free at once. Admins have a full management dashboard: live KPIs and charts, a live map showing which vehicle is in each slot, parked vehicles, searchable parking history, slot management, operator account management and live operator activity. Role-based access control is enforced on the server for every endpoint.
 >
 > **Documentation:** [docs/API.md](docs/API.md) (REST) · [docs/REALTIME.md](docs/REALTIME.md) (WebSocket, REST vs WebSocket, test client) · Swagger UI at `http://localhost:8080/swagger-ui.html` while the server runs · sample requests in [smartpark-server/http/smartpark-api.http](smartpark-server/http/smartpark-api.http)
 
@@ -66,6 +66,7 @@ SmartPark/
         │   ├── service/   RealtimeService (WebSocket -> JavaFX properties and FX-thread events)
         │   ├── realtime/  RealtimeClient: WebSocket with heartbeat, reconnect, replay, de-duplication
         │   ├── parking/   SlotMapModel (map state + selection rules), ReceiptData
+        │   ├── print/     Receipt template, layout, paper sizes, JavaFX printing
         │   ├── ui/
         │   │   ├── navigation/  View (screens + allowed roles), AccessPolicy, Navigator
         │   │   ├── login/       LoginController

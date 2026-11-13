@@ -513,6 +513,8 @@
 /* Receipt dialog */
 .receipt-dialog { -fx-background-color: -sp-bg; }
 .receipt-paper { -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.18), 18, 0, 0, 4); }
+.receipt-preview, .receipt-preview > .viewport { -fx-background-color: #e2e8f0; -fx-background-radius: 8; }
+.receipt-preview { -fx-padding: 0; -fx-background-insets: 0; -fx-border-color: -sp-border; -fx-border-radius: 8; }
 
 /* Access denied */
 .denied-card { -fx-padding: 40; }

@@ -1,5 +1,7 @@
 package com.smartpark.client.app;
 
+import com.smartpark.client.print.PrintSettings;
+import com.smartpark.client.print.ReceiptPrinter;
 import com.smartpark.client.config.ClientConfig;
 import com.smartpark.client.net.ApiClient;
 import com.smartpark.client.service.AdminService;
@@ -17,6 +19,7 @@ import com.smartpark.client.session.SessionManager;
  *   RealtimeService  WebSocket connection, events and connection status for the UI
  *   ParkingService   parking operations (slots, categories, entry, exit) on top of ApiClient
  *   AdminService     admin operations (history, slot and user management, activity)
+ *   ReceiptPrinter   receipt printing (JavaFX printing API) with this PC's printer settings
  * </pre>
  */
 public final class AppContext implements AutoCloseable {
@@ -27,6 +30,8 @@ public final class AppContext implements AutoCloseable {
     private final RealtimeService realtime;
     private final ParkingService parking;
     private final AdminService admin;
+    private final ReceiptPrinter receiptPrinter = new ReceiptPrinter();
+    private final PrintSettings printSettings = PrintSettings.from(ClientConfig.loadProperties());
 
     public AppContext(ClientConfig config) {
         this.config = config;
@@ -59,6 +64,15 @@ public final class AppContext implements AutoCloseable {
 
     public AdminService admin() {
         return admin;
+    }
+
+    public ReceiptPrinter receiptPrinter() {
+        return receiptPrinter;
+    }
+
+    /** Printer name and paper size configured for this PC. */
+    public PrintSettings printSettings() {
+        return printSettings;
     }
 
     @Override
