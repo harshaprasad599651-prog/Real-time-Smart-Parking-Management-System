@@ -430,6 +430,18 @@
 }
 .legend-text { -fx-text-fill: -sp-muted; -fx-font-size: 12px; }
 
+/* Exit: status badge and result card */
+.status-badge {
+    -fx-background-color: -sp-blue-bg;
+    -fx-text-fill: -sp-blue-dk;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 4 10;
+    -fx-background-radius: 12;
+}
+.result-card { -fx-background-color: #f0fdf4; -fx-border-color: #22c55e; -fx-border-width: 1.5; }
+.result-title { -fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #15803d; }
+
 /* Last ticket issued */
 .ticket-box {
     -fx-background-color: -sp-green-bg;

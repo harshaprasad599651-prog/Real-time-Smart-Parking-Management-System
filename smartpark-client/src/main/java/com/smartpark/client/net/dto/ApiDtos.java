@@ -84,6 +84,10 @@ public final class ApiDtos {
     public record ExitRequest(String vehicleNumber) {
     }
 
+    /** A page of parking sessions ({@code GET /api/parking/sessions?...}). */
+    public record SessionPage(List<ParkingSession> content, int page, int size, long totalElements, int totalPages) {
+    }
+
     /** {@code GET /api/parking/active/{vehicle}}: what the exit operator reviews before confirming. */
     public record ExitLookup(ParkingSession session, SlotInfo slot, long minutesParked) {
     }

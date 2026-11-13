@@ -3,7 +3,10 @@ package com.smartpark.client.service;
 import com.smartpark.client.net.ApiClient;
 import com.smartpark.client.net.dto.ApiDtos.Category;
 import com.smartpark.client.net.dto.ApiDtos.EntryRequest;
+import com.smartpark.client.net.dto.ApiDtos.ExitLookup;
+import com.smartpark.client.net.dto.ApiDtos.ExitRequest;
 import com.smartpark.client.net.dto.ApiDtos.ParkingSession;
+import com.smartpark.client.net.dto.ApiDtos.SessionPage;
 import com.smartpark.client.net.dto.ApiDtos.SlotInfo;
 import com.smartpark.client.realtime.RealtimeEvent;
 import tools.jackson.core.type.TypeReference;
@@ -52,6 +55,42 @@ public final class ParkingService {
      */
     public CompletableFuture<ParkingSession> registerEntry(EntryRequest request) {
         return api.post("/api/parking/entry", request, ParkingSession.class);
+    }
+
+    // --------------------------------------------------------------- exit
+
+    /** {@code GET /api/parking/active/{vehicle}}: the ACTIVE session and its slot; 404 NO_ACTIVE_SESSION if none. */
+    public CompletableFuture<ExitLookup> findActiveSession(String vehicleNumber) {
+        return api.get("/api/parking/active/" + enc(vehicleNumber), ExitLookup.class);
+    }
+
+    /**
+     * {@code POST /api/parking/exit}: the server completes the session and releases the slot in one
+     * transactional operation. Completes with the COMPLETED session (exit time, duration).
+     */
+    public CompletableFuture<ParkingSession> confirmExit(String vehicleNumber) {
+        return api.post("/api/parking/exit", new ExitRequest(vehicleNumber), ParkingSession.class);
+    }
+
+    /** {@code GET /api/parking/sessions/{ticketId}}: used to verify the outcome of an exit whose response was lost. */
+    public CompletableFuture<ParkingSession> sessionByTicket(String ticketId) {
+        return api.get("/api/parking/sessions/" + enc(ticketId), ParkingSession.class);
+    }
+
+    /** The vehicle's most recent COMPLETED session, if any (to explain "already checked out"). */
+    public CompletableFuture<Optional<ParkingSession>> lastCompletedSession(String vehicleNumber) {
+        return api.get("/api/parking/sessions?status=COMPLETED&size=1&vehicleNumber=" + enc(vehicleNumber), SessionPage.class)
+                .thenApply(page -> page.content() == null || page.content().isEmpty()
+                        ? Optional.<ParkingSession>empty() : Optional.of(page.content().getFirst()));
+    }
+
+    /** {@code GET /api/parking/sessions/active}: vehicles currently inside. */
+    public CompletableFuture<List<ParkingSession>> activeSessions() {
+        return api.get("/api/parking/sessions/active", new TypeReference<List<ParkingSession>>() { });
+    }
+
+    private static String enc(String s) {
+        return URLEncoder.encode(s, StandardCharsets.UTF_8);
     }
 
     /** The slot carried by a SLOT_OCCUPIED / SLOT_RELEASED / PARKING_MAP_UPDATED event, if any. */

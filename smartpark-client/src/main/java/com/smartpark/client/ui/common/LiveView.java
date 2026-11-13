@@ -102,6 +102,20 @@ public abstract class LiveView implements ViewController {
         }));
     }
 
+    /**
+     * Scrolls the page containing {@code node} back to the top. JavaFX's ScrollPane does not follow
+     * focus, so after a card appears or disappears the operator could otherwise be left looking
+     * at the bottom of the page.
+     */
+    protected static void scrollToTop(javafx.scene.Node node) {
+        for (javafx.scene.Node n = node.getParent(); n != null; n = n.getParent()) {
+            if (n instanceof javafx.scene.control.ScrollPane scroll) {
+                Platform.runLater(() -> scroll.setVvalue(0)); // after the layout pass
+                return;
+            }
+        }
+    }
+
     protected static void hide(Label label) {
         if (label != null) {
             label.setVisible(false);

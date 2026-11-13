@@ -10,7 +10,7 @@ University **Network Programming** project. Three computers on the same LAN/Wi-F
 
 Clients send commands to the server through a **REST API (HTTP/JSON)** and receive real-time updates through a **WebSocket** (`ws://<server>:8080/ws`). **Only the server connects to MongoDB.** The Entry and Exit clients never talk to the database directly.
 
-> **Current stage:** operator workflows. Entry operators register a vehicle, pick a compatible free slot on a live graphical parking map, confirm, and print the receipt. Exit operators find the active session, see the slot highlighted on the map, and confirm the departure. Every terminal's map updates instantly. Admins see the same live map on the Overview.
+> **Current stage:** operator dashboards. Entry operators register a vehicle (with optional notes), pick a compatible free slot on a live graphical parking map, confirm, and get the ticket with a prepared receipt (physical printing comes later). Exit operators search a vehicle, review its active session, and confirm the exit. The server completes it transactionally, and every terminal sees the slot become free at once. Admins see the same live map on the Overview.
 >
 > **Documentation:** [docs/API.md](docs/API.md) (REST) · [docs/REALTIME.md](docs/REALTIME.md) (WebSocket, REST vs WebSocket, test client) · Swagger UI at `http://localhost:8080/swagger-ui.html` while the server runs · sample requests in [smartpark-server/http/smartpark-api.http](smartpark-server/http/smartpark-api.http)
 

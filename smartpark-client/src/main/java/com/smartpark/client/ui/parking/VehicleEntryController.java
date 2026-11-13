@@ -305,12 +305,7 @@ public class VehicleEntryController extends LiveView {
 
     /** After the receipt closes: scroll back to the top and put the cursor in the vehicle field. */
     private void readyForNextVehicle() {
-        for (javafx.scene.Node n = vehicleField.getParent(); n != null; n = n.getParent()) {
-            if (n instanceof javafx.scene.control.ScrollPane scroll) {
-                scroll.setVvalue(0); // ScrollPane does not follow focus by itself
-                break;
-            }
-        }
+        scrollToTop(vehicleField);
         vehicleField.requestFocus();
     }
 

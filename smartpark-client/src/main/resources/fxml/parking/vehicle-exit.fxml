@@ -11,6 +11,7 @@
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
+<!-- Exit Operator dashboard: search, session details / exit result, parked list, live map, activity. -->
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.smartpark.client.ui.parking.VehicleExitController" spacing="20">
 
@@ -22,22 +23,27 @@
             <ColumnConstraints percentWidth="60"/>
         </columnConstraints>
 
-        <!-- ===================== Search + details ===================== -->
         <VBox spacing="20" GridPane.columnIndex="0">
+            <!-- ========================= Search ========================= -->
             <VBox styleClass="card" spacing="12">
                 <Label text="Find parked vehicle" styleClass="card-title"/>
+                <Label text="Vehicle registration number" styleClass="field-label"/>
                 <HBox spacing="10">
-                    <TextField fx:id="searchField" promptText="Vehicle number, e.g. WP CAB-1234"
+                    <TextField fx:id="searchField" promptText="e.g. WP CAB-1234"
                                styleClass="input, vehicle-input" HBox.hgrow="ALWAYS"/>
                     <Button fx:id="findButton" text="Find" onAction="#onFind" styleClass="primary-button"
                             minWidth="-Infinity"/>
                 </HBox>
-                <Label fx:id="searchError" styleClass="error-banner" wrapText="true" maxWidth="Infinity"/>
-                <Label fx:id="resultBanner" styleClass="success-banner" wrapText="true" maxWidth="Infinity"/>
+                <Label fx:id="searchMessage" styleClass="info-banner" wrapText="true" maxWidth="Infinity"/>
             </VBox>
 
+            <!-- ==================== Active session ===================== -->
             <VBox fx:id="detailsCard" styleClass="card, details-card" spacing="14">
-                <Label text="Active parking session" styleClass="card-title"/>
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Active parking session" styleClass="card-title"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Label fx:id="statusBadge" styleClass="status-badge"/>
+                </HBox>
                 <HBox styleClass="selected-slot" spacing="14" alignment="CENTER_LEFT">
                     <Label fx:id="slotCodeLabel" styleClass="selected-slot-code"/>
                     <VBox>
@@ -45,7 +51,7 @@
                         <Label fx:id="slotLocationLabel" styleClass="meta-value"/>
                     </VBox>
                 </HBox>
-                <GridPane hgap="14" vgap="8" styleClass="details-grid">
+                <GridPane hgap="14" vgap="8">
                     <columnConstraints>
                         <ColumnConstraints minWidth="100"/>
                         <ColumnConstraints hgrow="ALWAYS"/>
@@ -56,20 +62,48 @@
                     <Label fx:id="categoryLabel" styleClass="detail-value" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
                     <Label text="Ticket" styleClass="muted" GridPane.rowIndex="2"/>
                     <Label fx:id="ticketLabel" styleClass="detail-value" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
-                    <Label text="Entered" styleClass="muted" GridPane.rowIndex="3"/>
+                    <Label text="Entry time" styleClass="muted" GridPane.rowIndex="3"/>
                     <Label fx:id="enteredLabel" styleClass="detail-value" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
                     <Label text="Time parked" styleClass="muted" GridPane.rowIndex="4"/>
                     <Label fx:id="durationLabel" styleClass="detail-value" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
                     <Label text="Entry operator" styleClass="muted" GridPane.rowIndex="5"/>
                     <Label fx:id="operatorLabel" styleClass="detail-value" GridPane.rowIndex="5" GridPane.columnIndex="1"/>
+                    <Label fx:id="notesCaption" text="Notes" styleClass="muted" GridPane.rowIndex="6"/>
+                    <Label fx:id="notesLabel" styleClass="detail-value" wrapText="true" GridPane.rowIndex="6" GridPane.columnIndex="1"/>
                 </GridPane>
+                <Label fx:id="connectionHint" styleClass="warning-banner" wrapText="true" maxWidth="Infinity"
+                       text="Waiting for the live connection to the server before confirming the exit."/>
                 <HBox spacing="10">
-                    <Button text="Cancel" onAction="#onCancel" styleClass="secondary-button"/>
-                    <Button fx:id="confirmButton" text="Confirm departure" onAction="#onConfirm"
+                    <Button fx:id="cancelButton" text="Cancel" onAction="#onCancel" styleClass="secondary-button"/>
+                    <Button fx:id="confirmButton" text="Confirm vehicle exit" onAction="#onConfirmExit"
                             styleClass="primary-button" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
                 </HBox>
             </VBox>
 
+            <!-- ===================== Exit completed ==================== -->
+            <VBox fx:id="resultCard" styleClass="card, result-card" spacing="10">
+                <Label fx:id="resultTitle" styleClass="result-title" wrapText="true"/>
+                <GridPane hgap="14" vgap="6">
+                    <columnConstraints>
+                        <ColumnConstraints minWidth="100"/>
+                        <ColumnConstraints hgrow="ALWAYS"/>
+                    </columnConstraints>
+                    <Label text="Vehicle" styleClass="muted" GridPane.rowIndex="0"/>
+                    <Label fx:id="resultVehicle" styleClass="detail-value" wrapText="true" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+                    <Label text="Slot" styleClass="muted" GridPane.rowIndex="1"/>
+                    <Label fx:id="resultSlot" styleClass="detail-value" wrapText="true" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+                    <Label text="Ticket" styleClass="muted" GridPane.rowIndex="2"/>
+                    <Label fx:id="resultTicket" styleClass="detail-value" wrapText="true" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+                    <Label text="Entered" styleClass="muted" GridPane.rowIndex="3"/>
+                    <Label fx:id="resultEntered" styleClass="detail-value" wrapText="true" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+                    <Label text="Exited" styleClass="muted" GridPane.rowIndex="4"/>
+                    <Label fx:id="resultExited" styleClass="detail-value" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+                    <Label text="Duration" styleClass="muted" GridPane.rowIndex="5"/>
+                    <Label fx:id="resultDuration" styleClass="detail-value" wrapText="true" GridPane.rowIndex="5" GridPane.columnIndex="1"/>
+                </GridPane>
+            </VBox>
+
+            <!-- ================== Currently parked ===================== -->
             <VBox styleClass="card" spacing="12">
                 <HBox alignment="CENTER_LEFT">
                     <Label text="Vehicles currently parked" styleClass="card-title"/>

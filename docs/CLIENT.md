@@ -91,12 +91,27 @@ When the session ends, the app returns to the login screen with an explanation:
 
 **Separation:** `VehicleEntryController` handles the screen only. `ParkingService` does the REST calls and event parsing, `SlotMapModel` holds the map rules (plain Java, unit-tested), and `SlotMapView`, `StatCard`, `ConfirmDialog` and `ActivityFeed` are reusable components.
 
-## Exit workflow
+## Exit Operator dashboard
 
-1. Type the vehicle number (or click it in **Vehicles currently parked**) and press **Find**: `GET /api/parking/active/{vehicle}`.
-2. The session card shows the slot, location, ticket, category, entry time, time parked and entry operator. The slot is **highlighted in orange** on the map.
-3. **Confirm departure:** `POST /api/parking/exit` stores the exit time, completes the session and releases the slot. The banner shows the duration, and every terminal's map turns the slot green.
-4. If another terminal checks the same vehicle out first, the live `VEHICLE_EXITED` event clears the card here ("already checked out at EXIT-GATE-2").
+| Step | What happens |
+|---|---|
+| Search | Type the vehicle number (or click it in *Vehicles currently parked*) and press **Find**: `ParkingService.findActiveSession` → `GET /api/parking/active/{vehicle}` |
+| Session card | Vehicle, category, ticket ID, assigned slot and location, entry time, time parked, entry operator, notes, and a **status badge** (`ACTIVE · parked 52 min`). The slot is highlighted orange on the live map |
+| Confirm vehicle exit | `ConfirmDialog` shows vehicle, slot, ticket, entry time and time parked. On OK: `POST /api/parking/exit` |
+| Server (transactional) | Completes the session and releases the slot as one unit of work: a MongoDB transaction on a replica set, otherwise atomic conditional updates. It broadcasts `SLOT_RELEASED` + `VEHICLE_EXITED` **only after** it has committed |
+| Success | The *Exit completed* card shows vehicle, slot released, ticket and `COMPLETED`, entry and exit times, the exit operator and the duration. Only now does this screen show the slot as free; every entry terminal and the admin dashboard update at the same moment via the WebSocket |
+
+### Error handling (`ExitMessages`, unit-tested)
+
+| Situation | Behaviour |
+|---|---|
+| Invalid vehicle number | Rejected locally, no request: "Use 2-12 letters and digits, e.g. WP CAB-1234." |
+| No active session, never parked | "ZZZ999 has no active parking session. Check the number on the ticket." |
+| Already completed session | The client asks for the vehicle's last completed session: "WPCAB1234 is not parked now: ticket SP-… was already completed on 13 Nov, 13:24 by exit1 (slot A-03)." |
+| Checked out at another terminal meanwhile | A live `VEHICLE_EXITED` event clears the card with an explanation. If the exit is confirmed anyway, the server answers 404 `NO_ACTIVE_SESSION` → "already checked out… Nothing was changed." |
+| Network disconnection | **Confirm vehicle exit** is disabled while the live connection is down, with a hint; a search shows "Cannot reach the SmartPark server…" |
+| Connection lost / 5xx **after** the exit was sent | The outcome is unknown, so the client asks the server (`GET /api/parking/sessions/{ticket}`): COMPLETED → success card; ACTIVE → "The exit was NOT recorded… confirm again"; still unreachable → "unknown whether the exit was recorded. Do not let the vehicle leave yet." The operator is never told *done* unless the server says so |
+| Other server errors | Shown with the server's error code; nothing is assumed to have changed |
 
 ## Parking map (`SlotMapView` + `SlotMapModel`)
 
@@ -116,6 +131,7 @@ When the session ends, the app returns to the login screen with an explanation:
 |---|---|
 | `AccessPolicyTest` | Each role's home screen and sidebar; operators cannot open other roles' screens |
 | `SlotMapModelTest` | Layout order, compatible-free-only selection, toggle, category change, live event taking the selected slot, release, server availability is authoritative, highlight |
+| `ExitMessagesTest` | Never parked vs already completed (when, by whom), which errors make an exit outcome unknown, search and rejection messages |
 | `ReceiptAndValidationTest` | Receipt lines (server entry time in local zone) and vehicle-number validation |
 | `ApiClientErrorParsingTest` | Problem+json, non-JSON errors and unreachable server become clear `ApiException`s |
 | `EventSequenceTrackerTest` | Duplicate / gap / server-restart handling of real-time events |
