@@ -29,7 +29,7 @@
                 <Label text="Find parked vehicle" styleClass="card-title"/>
                 <Label text="Vehicle registration number" styleClass="field-label"/>
                 <HBox spacing="10">
-                    <TextField fx:id="searchField" promptText="e.g. WP CAB-1234"
+                    <TextField fx:id="searchField" promptText="e.g. WP CAB-1234" onAction="#onFind"
                                styleClass="input, vehicle-input" HBox.hgrow="ALWAYS"/>
                     <Button fx:id="findButton" text="Find" onAction="#onFind" styleClass="primary-button"
                             minWidth="-Infinity"/>

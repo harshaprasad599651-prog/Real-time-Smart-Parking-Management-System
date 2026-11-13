@@ -10,9 +10,23 @@ University **Network Programming** project. Three computers on the same LAN/Wi-F
 
 Clients send commands to the server through a **REST API (HTTP/JSON)** and receive real-time updates through a **WebSocket** (`ws://<server>:8080/ws`). **Only the server connects to MongoDB.** The Entry and Exit clients never talk to the database directly.
 
-> **Current stage:** security and reliability hardening ([docs/SECURITY.md](docs/SECURITY.md)): brute-force protection, constant-time sign-in, sanitised input, audit of refused operations, database-outage handling, graceful shutdown. Earlier: LAN deployment ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)). Entry operators register a vehicle (with optional notes), pick a compatible free slot on a live graphical parking map, confirm, and get the ticket with a receipt preview that prints on thermal (80/58 mm) or standard printers through the JavaFX printing API; any receipt can be reprinted by ticket ID. Exit operators search a vehicle, review its active session, and confirm the exit. The server completes it transactionally, and every terminal sees the slot become free at once. Admins have a full management dashboard: live KPIs and charts, a live map showing which vehicle is in each slot, parked vehicles, searchable parking history, slot management, operator account management and live operator activity. Role-based access control is enforced on the server for every endpoint.
+> **Status:** final version, ready for demonstration and submission. All 207 automated tests and the 61-check REST system test pass ([docs/TESTING.md](docs/TESTING.md)).
 >
-> **Documentation:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) (three-PC Windows deployment) · [docs/SECURITY.md](docs/SECURITY.md) (security and reliability) · [docs/API.md](docs/API.md) (REST) · [docs/REALTIME.md](docs/REALTIME.md) (WebSocket, REST vs WebSocket, test client) · Swagger UI at `http://localhost:8080/swagger-ui.html` while the server runs · sample requests in [smartpark-server/http/smartpark-api.http](smartpark-server/http/smartpark-api.http)
+> Entry operators register a vehicle, pick a compatible free slot on a live graphical map, and print a parking ticket (thermal 80/58 mm or standard printers, reprint by ticket ID). Exit operators find the vehicle and confirm its exit. Every terminal sees each change at once. Admins have live KPIs and charts, a map showing which vehicle is in each slot, history, slot and user management, and live operator activity. Roles are enforced by the server; the system recovers by itself from network drops, server restarts and database outages.
+
+### Documentation
+
+| Document | For | Contents |
+|---|---|---|
+| [docs/PROJECT_REPORT.md](docs/PROJECT_REPORT.md) | Examiners | Overview, problem statement, objectives, functional and non-functional requirements, architecture, UML use case and class diagrams, sequence diagrams (entry, exit), ER diagram, database schema, network architecture, limitations and future work |
+| [docs/DEMO.md](docs/DEMO.md) | Presenters | Three-computer demonstration script, likely questions, recovery plan |
+| [docs/USER_MANUAL.md](docs/USER_MANUAL.md) | Operators, admin | How to use every screen |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Installer | Installation on three Windows PCs: packages, network, firewall, secure MongoDB |
+| [docs/API.md](docs/API.md) | Developers | REST API reference (also Swagger UI at `http://<server>:8080/swagger-ui.html`) |
+| [docs/REALTIME.md](docs/REALTIME.md) | Developers | WebSocket protocol, REST vs WebSocket, reliability, test client |
+| [docs/SECURITY.md](docs/SECURITY.md) | Examiners, developers | Security and reliability measures |
+| [docs/TESTING.md](docs/TESTING.md) | Examiners | Test inventory and results |
+| [docs/CLIENT.md](docs/CLIENT.md) | Developers | How the JavaFX client is built |
 
 ---
 
@@ -21,10 +35,10 @@ Clients send commands to the server through a **REST API (HTTP/JSON)** and recei
 | Layer | Technology |
 |---|---|
 | Language | Java 21 |
-| Build | Maven (multi-module, Maven Wrapper included) |
+| Build | Maven (multi-module, Maven Wrapper included); client packaged with jlink (own Java runtime) |
 | Server | Spring Boot 4.1 · Spring Web MVC · Spring WebSocket · **Spring Data MongoDB** · Bean Validation · BCrypt (spring-security-crypto) · springdoc-openapi (Swagger UI) |
-| Database | **MongoDB Community Server 8.0**, installed locally on the Admin PC (not Atlas) |
-| Desktop client | JavaFX 21 (Controls + FXML) · Java HTTP Client (`java.net.http`) |
+| Database | **MongoDB Community Server 8.0 or newer** (tested with 9.0), installed locally on the Admin PC (not Atlas) |
+| Desktop client | JavaFX 21 (Controls, FXML, printing) · Java HTTP Client and WebSocket (`java.net.http`) · Jackson |
 
 ---
 
@@ -37,51 +51,61 @@ SmartPark/
 │
 ├── smartpark-server/               Spring Boot server (runs on the Admin PC)
 │   ├── application-local.properties.example   Template for local overrides (git-ignored copy)
+│   ├── http/smartpark-api.http      Sample requests (VS Code REST Client / IntelliJ)
 │   └── src/main/java/com/smartpark/server/
 │       ├── SmartParkServerApplication.java
-│       ├── config/        MongoConfig (transaction manager), WebSocketConfig, SchedulingConfig
-│       ├── document/      @Document classes + enums (User, VehicleCategory, ParkingSlot, ParkingSession, ActivityLog, Counter)
+│       ├── config/        MongoConfig (timeouts, transactions), WebConfig (RBAC), WebSocketConfig, LAN address report
+│       ├── document/      @Document classes + enums (User, VehicleCategory, ParkingSlot, ParkingSession + TicketReceipt,
+│       │                  ActivityLog, LoginSession, Counter)
 │       ├── repository/    MongoRepository interfaces
 │       ├── service/       Business logic: UserService, VehicleCategoryService, ParkingSlotService,
-│       │                  ParkingSessionService (atomic allocation), ActivityLogService, TicketIdGenerator
+│       │                  ParkingSessionService (atomic allocation), ReceiptService, ParkingStatisticsService,
+│       │                  ActivityLogService, TicketIdGenerator
 │       ├── persistence/   MongoIndexInitializer, MongoTransactionRunner, index names
 │       ├── dto/           Request/response records with Bean Validation constraints
 │       ├── bootstrap/     DataSeeder (sample users, categories, slots)
 │       ├── scheduler/     SlotReconciliationJob
-│       ├── security/      PasswordConfig (BCrypt)
+│       ├── security/      BCrypt, AuthTokenService, RoleCheckInterceptor (@RequireRole), LoginAttemptLimiter
 │       ├── exception/     Domain exceptions
 │       ├── util/          Normalizer (vehicle numbers, codes, usernames)
-│       ├── controller/    REST controllers (categories, slots, parking, monitoring, realtime status, health)
+│       ├── controller/    REST controllers (auth, parking, receipts, slots, categories, users, monitoring, realtime, health)
 │       ├── event/         Domain events published by services after a committed change
 │       └── websocket/     RealtimeHub (broadcast, replay, heartbeat), handler, handshake check, event relay
 │
-└── smartpark-client/               JavaFX desktop client (runs on all three PCs)
-    └── src/main/
-        ├── java/module-info.java
-        ├── java/com/smartpark/client/
-        │   ├── app/       SmartParkClientApp (start-up wiring), AppContext (shared services)
-        │   ├── config/    ClientConfig (server address, terminal name)
-        │   ├── net/       ApiClient (Java HttpClient + Jackson, bearer token, problem+json errors), DTOs
-        │   ├── session/   SessionManager (login/logout/expiry), UserSession, UserRole
-        │   ├── service/   RealtimeService (WebSocket -> JavaFX properties and FX-thread events)
-        │   ├── realtime/  RealtimeClient: WebSocket with heartbeat, reconnect, replay, de-duplication
-        │   ├── parking/   SlotMapModel (map state + selection rules), ReceiptData
-        │   ├── print/     Receipt template, layout, paper sizes, JavaFX printing
-        │   ├── ui/
-        │   │   ├── navigation/  View (screens + allowed roles), AccessPolicy, Navigator
-        │   │   ├── login/       LoginController
-        │   │   ├── shell/       MainLayoutController (sidebar, top bar, status bar)
-        │   │   ├── dashboard/   Admin overview (KPIs, usage bars, live map, activity)
-        │   │   ├── parking/     Vehicle entry, vehicle exit, receipt preview + printing
-        │   │   ├── connections/ Connected terminals (admin)
-        │   │   ├── common/      LiveView base class, access-denied screen
-        │   │   └── component/   SlotMapView, StatCard, ActivityFeed, ConnectionIndicator, Icons
-        │   ├── tools/     RealtimeTestClient (command-line demo / live monitor)
-        │   └── util/      Formats
-        └── resources/
-            ├── fxml/      login, main-layout, dashboard/*, parking/*, connections, access-denied
-            ├── css/smartpark.css             Theme (colours, typography, components)
-            └── smartpark-client.properties   Default client settings
+├── smartpark-client/               JavaFX desktop client (runs on all three PCs)
+│   └── src/main/
+│       ├── java/module-info.java
+│       ├── java/com/smartpark/client/
+│       │   ├── app/       SmartParkClientApp (start-up wiring), AppContext (shared services)
+│       │   ├── config/    ClientConfig (server address, terminal name)
+│       │   ├── net/       ApiClient (Java HttpClient + Jackson, bearer token, problem+json errors), DTOs
+│       │   ├── session/   SessionManager (login/logout/expiry), UserSession, UserRole
+│       │   ├── service/   ParkingService, AdminService, RealtimeService (WebSocket -> JavaFX properties)
+│       │   ├── realtime/  RealtimeClient: WebSocket with heartbeat, reconnect, replay, de-duplication
+│       │   ├── parking/   SlotMapModel (map state + selection rules), ReceiptData
+│       │   ├── print/     Receipt template, layout, paper sizes, JavaFX printing
+│       │   ├── ui/
+│       │   │   ├── navigation/  View (screens + allowed roles), AccessPolicy, Navigator
+│       │   │   ├── login/       LoginController
+│       │   │   ├── shell/       MainLayoutController (sidebar, top bar, status bar)
+│       │   │   ├── dashboard/   Admin overview (KPIs, charts, live map with vehicle numbers, activity)
+│       │   │   ├── admin/       Parked vehicles, parking history, slot management, users, activity log
+│       │   │   ├── parking/     Vehicle entry, vehicle exit, receipt preview + printing
+│       │   │   ├── connections/ Connected terminals (admin)
+│       │   │   ├── common/      LiveView base class, access-denied screen
+│       │   │   └── component/   SlotMapView, StatCard, ActivityFeed, ConnectionIndicator, Icons
+│       │   ├── tools/     RealtimeTestClient (command-line demo / live monitor)
+│       │   └── util/      Formats
+│       └── resources/
+│           ├── fxml/      login, main-layout, dashboard/*, parking/*, connections, access-denied
+│           ├── css/smartpark.css             Theme (colours, typography, components)
+│           ├── receipt-template.properties   Receipt text and layout (customisable per PC)
+│           └── smartpark-client.properties   Default client settings
+│
+├── deploy/                         Windows deployment: build-release.cmd, server start/firewall scripts,
+│                                   MongoDB account script, client launcher and connection test
+├── tests/system/endpoint-test.ps1  REST system test (all 31 operations, 61 checks)
+└── docs/                           Report, manuals, API, testing, demo script (see Documentation)
 ```
 
 ---

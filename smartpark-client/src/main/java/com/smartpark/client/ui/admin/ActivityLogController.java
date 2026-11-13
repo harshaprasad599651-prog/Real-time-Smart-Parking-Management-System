@@ -37,7 +37,8 @@ public class ActivityLogController extends LiveView {
 
     private static final int LIMIT = 300;
     private static final List<String> ACTIONS = List.of("All actions", "VEHICLE_ENTRY", "VEHICLE_EXIT",
-            "ALLOCATION_REJECTED", "LOGIN_SUCCESS", "LOGIN_FAILED", "LOGOUT", "SLOT_CREATED", "SLOT_UPDATED",
+            "ALLOCATION_REJECTED", "RECEIPT_PRINTED", "RECEIPT_REPRINTED", "LOGIN_SUCCESS", "LOGIN_FAILED",
+            "LOGIN_LOCKED", "ACCESS_DENIED", "LOGOUT", "SLOT_CREATED", "SLOT_UPDATED",
             "SLOT_DISABLED", "SLOT_ENABLED", "CATEGORY_CREATED", "CATEGORY_UPDATED", "USER_CREATED",
             "USER_STATUS_CHANGED", "USER_ROLE_CHANGED", "SLOT_RECONCILED", "DATA_SEEDED");
 
@@ -177,7 +178,7 @@ public class ActivityLogController extends LiveView {
         return switch (action) {
             case "VEHICLE_ENTRY" -> "badge-blue";
             case "VEHICLE_EXIT" -> "badge-green";
-            case "ALLOCATION_REJECTED", "LOGIN_FAILED" -> "badge-red";
+            case "ALLOCATION_REJECTED", "LOGIN_FAILED", "LOGIN_LOCKED", "ACCESS_DENIED" -> "badge-red";
             case "USER_CREATED", "USER_STATUS_CHANGED", "USER_ROLE_CHANGED" -> "badge-purple";
             default -> "badge-grey";
         };
