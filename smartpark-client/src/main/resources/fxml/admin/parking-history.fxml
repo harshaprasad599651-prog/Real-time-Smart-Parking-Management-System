@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.smartpark.client.ui.admin.ParkingHistoryController" spacing="16">
+
+    <Label fx:id="errorLabel" styleClass="error-banner" wrapText="true" maxWidth="Infinity"/>
+
+    <!-- Filters (wrap on narrow windows) -->
+    <VBox styleClass="card" spacing="10">
+        <Label text="Search parking records" styleClass="card-title"/>
+        <FlowPane hgap="14" vgap="10" alignment="CENTER_LEFT">
+            <VBox spacing="4">
+                <Label text="Vehicle number" styleClass="field-label"/>
+                <TextField fx:id="vehicleField" promptText="e.g. WP CAB-1234" styleClass="input" prefWidth="200"
+                           onAction="#onSearch"/>
+            </VBox>
+            <VBox spacing="4">
+                <Label text="Entry from" styleClass="field-label"/>
+                <DatePicker fx:id="fromDate" prefWidth="150" promptText="any"/>
+            </VBox>
+            <VBox spacing="4">
+                <Label text="Entry to" styleClass="field-label"/>
+                <DatePicker fx:id="toDate" prefWidth="150" promptText="any"/>
+            </VBox>
+            <VBox spacing="4">
+                <Label text="Status" styleClass="field-label"/>
+                <ComboBox fx:id="statusBox" prefWidth="140" styleClass="input-combo"/>
+            </VBox>
+            <HBox spacing="8" alignment="BOTTOM_LEFT">
+                <Button text="Search" onAction="#onSearch" styleClass="primary-button" defaultButton="true"/>
+                <Button text="Today" onAction="#onToday" styleClass="secondary-button"/>
+                <Button text="Reset" onAction="#onReset" styleClass="secondary-button"/>
+            </HBox>
+        </FlowPane>
+        <Label fx:id="filterError" styleClass="error-banner" wrapText="true" maxWidth="Infinity"/>
+    </VBox>
+
+    <VBox styleClass="card" spacing="12">
+        <HBox spacing="10" alignment="CENTER_LEFT">
+            <Label text="Entries and exits" styleClass="card-title"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button fx:id="viewButton" text="View session" onAction="#onView" styleClass="secondary-button"/>
+        </HBox>
+        <TableView fx:id="table" prefHeight="520" styleClass="data-table"/>
+        <HBox spacing="10" alignment="CENTER_LEFT">
+            <Label fx:id="pageLabel" styleClass="muted"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button fx:id="prevButton" text="‹ Previous" onAction="#onPrev" styleClass="secondary-button"/>
+            <Button fx:id="nextButton" text="Next ›" onAction="#onNext" styleClass="secondary-button"/>
+        </HBox>
+    </VBox>
+</VBox>

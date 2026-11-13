@@ -30,12 +30,18 @@ Ready-made requests: [`smartpark-server/http/smartpark-api.http`](../smartpark-s
 
 Tokens are random 256-bit values. The server keeps only their SHA-256 hashes, in memory: restarting the server signs everyone out. Deactivating an account revokes all its tokens.
 
+### Role-based access control (enforced on the server)
+
+Every `/api/**` request passes through `RoleCheckInterceptor`. Each controller method declares its roles with `@RequireRole`. The interceptor validates the token and then **re-reads the user from MongoDB**, so a role change or deactivation takes effect on the very next request. Hiding a button in the client is only a convenience: a modified client still gets 403.
+
 | Operation | Allowed roles |
 |---|---|
-| Category and slot management | `ADMIN` |
+| `POST /api/auth/login`, `GET /api/health` | public (no token) |
+| User management (`/api/users/**`), activity log, connected terminals | `ADMIN` |
+| Category and slot changes (POST/PUT, disable/enable) | `ADMIN` |
 | Vehicle entry | `ENTRY_OPERATOR`, `ADMIN` |
-| Vehicle exit | `EXIT_OPERATOR`, `ADMIN` |
-| All `GET` requests | no token needed (read-only, LAN) |
+| Vehicle exit, exit search (`/api/parking/active/{v}`), history search (`/api/parking/sessions`) | `EXIT_OPERATOR`, `ADMIN` |
+| Every other `GET` (slots, categories, active sessions, one session, statistics) | any signed-in user |
 
 Missing, expired or revoked token: **401** `UNAUTHENTICATED`. Inactive account or wrong role: **403** `OPERATOR_NOT_AUTHORIZED`.
 
@@ -149,9 +155,21 @@ Vehicle numbers are normalized: case, spaces and hyphens are ignored, so `wp cab
 | GET | `/api/parking/sessions?vehicleNumber=&status=&slotCode=&from=&to=&page=0&size=20` | History, newest first, paged. `from`/`to` filter on entry time (ISO-8601; `from` inclusive, `to` exclusive). `size` 1-200 |
 | GET | `/api/parking/sessions/{ticketId}` | One session (receipt reprint) |
 | GET | `/api/statistics` | Occupancy and traffic statistics |
-| GET | `/api/activity?username=&limit=50` | Operator activity log, newest first (limit 1-500) |
+| GET | `/api/activity?username=&role=&action=&limit=50` | Operator activity log, newest first (ADMIN). Optional filters: user, role (`ENTRY_OPERATOR` ...), action (`VEHICLE_ENTRY`, `LOGIN_SUCCESS` ...); limit 1-500 |
 | GET | `/api/health` | Server status and server time |
 | GET | `/api/realtime/status` | Clients connected to the WebSocket (operator, role, terminal, address, last heartbeat) |
+
+### User management (ADMIN)
+
+| Method | Path | Description | Success |
+|---|---|---|---|
+| GET | `/api/users` | All accounts, sorted by username (never includes password hashes) | 200 |
+| POST | `/api/users` | Create an account `{ "username", "password", "role" }` | **201** + `Location` |
+| PUT | `/api/users/{username}/role` | Assign a role `{ "role": "EXIT_OPERATOR" }`. Signs the user out everywhere | 200 |
+| POST | `/api/users/{username}/activate` | Allow the account to sign in again | 200 |
+| POST | `/api/users/{username}/deactivate` | Block the account and revoke its tokens | 200 |
+
+Safety rules (**409** `INVALID_STATE`): an admin cannot deactivate or change the role of **their own** account, and the **last active admin** can never be deactivated or demoted, so the system always keeps an administrator. A duplicate username gives **409** `DUPLICATE_RESOURCE`. Every change is written to the activity log (`USER_CREATED`, `USER_ROLE_CHANGED`, `USER_ACTIVATED`, `USER_DEACTIVATED`).
 
 Real-time events (WebSocket `ws://<server>:8080/ws`) are described in [REALTIME.md](REALTIME.md).
 

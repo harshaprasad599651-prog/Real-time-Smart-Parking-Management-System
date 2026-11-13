@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.smartpark.client.ui.admin.ParkedVehiclesController" spacing="16">
+
+    <Label fx:id="errorLabel" styleClass="error-banner" wrapText="true" maxWidth="Infinity"/>
+
+    <VBox styleClass="card" spacing="14">
+        <HBox spacing="12" alignment="CENTER_LEFT">
+            <Label text="Vehicles currently parked" styleClass="card-title"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="countLabel" styleClass="muted"/>
+            <TextField fx:id="filterField" promptText="Filter: vehicle, slot or ticket" styleClass="input" prefWidth="260"/>
+        </HBox>
+        <TableView fx:id="table" prefHeight="560" styleClass="data-table"/>
+        <Label text="Double-click a row to view the full parking session. The list updates live." styleClass="muted"/>
+    </VBox>
+</VBox>

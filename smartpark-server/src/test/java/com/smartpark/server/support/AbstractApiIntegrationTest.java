@@ -46,7 +46,18 @@ public abstract class AbstractApiIntegrationTest extends AbstractMongoIntegratio
 
     // ------------------------------------------------------------ requests
 
+    /** GET as the admin (every /api endpoint except login and health now requires a signed-in user). */
     protected Response get(String path) {
+        return getAs(path, ADMIN);
+    }
+
+    /** GET identified by the X-Operator header (test mode). */
+    protected Response getAs(String path, String operator) {
+        return send(withOperator(request(path), operator).GET());
+    }
+
+    /** GET with no credentials at all. */
+    protected Response getAnonymous(String path) {
         return send(request(path).GET());
     }
 

@@ -101,6 +101,16 @@ public class RealtimeHub {
         }
     }
 
+    /**
+     * Sends a notification to the connected clients of one role only (e.g. audit entries for
+     * admins). It is a control message (sequence 0), so other clients' sequence numbers stay
+     * gap-free, and it is not kept for replay.
+     */
+    public void notifyRole(UserRole role, RealtimeEventType type, String actor, Object payload) {
+        TextMessage message = new TextMessage(toJson(control(type, actor, payload)));
+        clients.values().stream().filter(c -> c.role() == role).forEach(c -> c.enqueue(message));
+    }
+
     // ------------------------------------------------------- connect/disconnect
 
     /**

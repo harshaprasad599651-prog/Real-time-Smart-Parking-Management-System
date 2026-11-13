@@ -5,6 +5,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
@@ -13,8 +14,8 @@ import org.springframework.web.method.support.ModelAndViewContainer;
  * <pre>
  * public ParkingSessionDto entry(AuthenticatedOperator operator, @Valid @RequestBody ParkingEntryRequest body)
  * </pre>
- * If the request carries no valid credentials, the method is never called and the client
- * gets 401 UNAUTHENTICATED.
+ * Normally {@link RoleCheckInterceptor} has already authenticated the request and stored the
+ * operator; otherwise the credentials are checked here (401 if missing or invalid).
  */
 @Component
 public class CurrentOperatorArgumentResolver implements HandlerMethodArgumentResolver {
@@ -33,6 +34,10 @@ public class CurrentOperatorArgumentResolver implements HandlerMethodArgumentRes
     @Override
     public AuthenticatedOperator resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
                                                  NativeWebRequest request, WebDataBinderFactory binderFactory) {
+        Object checked = request.getAttribute(RoleCheckInterceptor.ATTRIBUTE, RequestAttributes.SCOPE_REQUEST);
+        if (checked instanceof AuthenticatedOperator operator) {
+            return operator;
+        }
         return authenticator.authenticate(request.getHeader(HttpHeaders.AUTHORIZATION),
                 request.getHeader(RequestAuthenticator.OPERATOR_HEADER));
     }

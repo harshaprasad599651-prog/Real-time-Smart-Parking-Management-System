@@ -1,5 +1,7 @@
 package com.smartpark.server.controller;
 
+import com.smartpark.server.document.UserRole;
+import com.smartpark.server.security.RequireRole;
 import com.smartpark.server.dto.CreateVehicleCategoryRequest;
 import com.smartpark.server.dto.UpdateVehicleCategoryRequest;
 import com.smartpark.server.dto.VehicleCategoryDto;
@@ -50,6 +52,7 @@ public class VehicleCategoryController {
         return categoryService.getCategory(categoryName);
     }
 
+    @RequireRole(UserRole.ADMIN)
     @PostMapping
     @Operation(summary = "Add a vehicle category (ADMIN)",
             description = "The name is normalised: \"Electric car\" becomes ELECTRIC_CAR.")
@@ -67,6 +70,7 @@ public class VehicleCategoryController {
         return ResponseEntity.created(location).body(created);
     }
 
+    @RequireRole(UserRole.ADMIN)
     @PutMapping("/{categoryName}")
     @Operation(summary = "Update a vehicle category (ADMIN)",
             description = "Replaces description and compatible slot types. Slots of newly compatible types start "

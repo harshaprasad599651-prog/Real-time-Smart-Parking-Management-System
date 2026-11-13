@@ -1,5 +1,6 @@
 package com.smartpark.server.websocket;
 
+import com.smartpark.server.document.UserRole;
 import com.smartpark.server.event.ParkingDomainEvent;
 import com.smartpark.server.websocket.RealtimePayloads.MapUpdate;
 import com.smartpark.server.websocket.RealtimePayloads.SlotChange;
@@ -51,6 +52,9 @@ public class ParkingEventRelay {
                         new SlotChange(e.slot(), e.reason(), null, null));
                 case ParkingDomainEvent.ParkingMapChanged e -> hub.broadcast(RealtimeEventType.PARKING_MAP_UPDATED,
                         e.actor(), new MapUpdate(e.reason(), e.slot(), e.categoryName()));
+                // Audit entries may mention failed logins etc.: admins only, not sequenced/replayed.
+                case ParkingDomainEvent.ActivityRecorded e -> hub.notifyRole(UserRole.ADMIN,
+                        RealtimeEventType.ACTIVITY_RECORDED, e.actor(), e.entry());
             }
         } catch (RuntimeException ex) {
             log.error("Could not broadcast {}", event, ex);

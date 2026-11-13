@@ -128,6 +128,10 @@ final class ClientConnection {
         return terminal;
     }
 
+    UserRole role() {
+        return role;
+    }
+
     ConnectionInfo info() {
         return new ConnectionInfo(session.getId(), clientId, operator, role, terminal, remoteAddress, connectedAt, lastSeenAt);
     }

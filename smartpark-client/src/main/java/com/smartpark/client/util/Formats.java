@@ -12,6 +12,9 @@ public final class Formats {
     private static final DateTimeFormatter DATE_TIME =
             DateTimeFormatter.ofPattern("dd MMM, HH:mm", Locale.ENGLISH).withZone(ZoneId.systemDefault());
 
+    private static final DateTimeFormatter DATE_TIME_SECONDS =
+            DateTimeFormatter.ofPattern("dd MMM, HH:mm:ss", Locale.ENGLISH).withZone(ZoneId.systemDefault());
+
     private Formats() {
     }
 
@@ -21,6 +24,11 @@ public final class Formats {
 
     public static String dateTime(Instant instant) {
         return instant == null ? "–" : DATE_TIME.format(instant);
+    }
+
+    /** {@code "13 Nov, 14:45:12"} */
+    public static String dateTimeSeconds(Instant instant) {
+        return instant == null ? "–" : DATE_TIME_SECONDS.format(instant);
     }
 
     public static String percent(double value) {

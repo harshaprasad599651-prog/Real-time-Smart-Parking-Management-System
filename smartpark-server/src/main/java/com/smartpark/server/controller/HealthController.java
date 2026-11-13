@@ -1,5 +1,6 @@
 package com.smartpark.server.controller;
 
+import com.smartpark.server.security.PublicEndpoint;
 import com.smartpark.server.dto.HealthResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +16,7 @@ import java.time.Instant;
  */
 @RestController
 @RequestMapping("/api/health")
+@PublicEndpoint
 public class HealthController {
 
     private final String applicationName;

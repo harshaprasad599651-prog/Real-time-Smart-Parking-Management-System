@@ -22,14 +22,29 @@ public enum View {
     ADMIN_DASHBOARD("Overview", "Car park status and live activity",
             "/fxml/dashboard/admin-dashboard.fxml", Icons.DASHBOARD, true, EnumSet.of(ADMIN)),
 
+    PARKED_VEHICLES("Parked vehicles", "Every vehicle currently inside",
+            "/fxml/admin/parked-vehicles.fxml", Icons.LIST, true, EnumSet.of(ADMIN)),
+
+    PARKING_HISTORY("Parking history", "Previous entries and exits",
+            "/fxml/admin/parking-history.fxml", Icons.HISTORY, true, EnumSet.of(ADMIN)),
+
+    SLOT_MANAGEMENT("Slot management", "Add, edit, disable and enable parking slots",
+            "/fxml/admin/slot-management.fxml", Icons.GRID, true, EnumSet.of(ADMIN)),
+
+    USER_MANAGEMENT("Users", "Operator accounts and roles",
+            "/fxml/admin/user-management.fxml", Icons.GROUP, true, EnumSet.of(ADMIN)),
+
+    ACTIVITY_LOG("Activity", "What entry and exit operators are doing",
+            "/fxml/admin/activity-log.fxml", Icons.ACTIVITY, true, EnumSet.of(ADMIN)),
+
+    CONNECTIONS("Terminals", "Operators connected to the central server",
+            "/fxml/connections.fxml", Icons.TERMINALS, true, EnumSet.of(ADMIN)),
+
     VEHICLE_ENTRY("Vehicle Entry", "Register incoming vehicles and assign a slot",
             "/fxml/parking/vehicle-entry.fxml", Icons.ENTRY, true, EnumSet.of(ENTRY_OPERATOR, ADMIN)),
 
     VEHICLE_EXIT("Vehicle Exit", "Confirm departures and release slots",
             "/fxml/parking/vehicle-exit.fxml", Icons.EXIT, true, EnumSet.of(EXIT_OPERATOR, ADMIN)),
-
-    CONNECTIONS("Terminals", "Operators connected to the central server",
-            "/fxml/connections.fxml", Icons.TERMINALS, true, EnumSet.of(ADMIN)),
 
     /** Shown instead of a screen the current role may not open. */
     ACCESS_DENIED("Access denied", "This screen is not available for your role",

@@ -151,6 +151,33 @@ public final class SlotMapModel {
         return Optional.ofNullable(selected).map(slots::get);
     }
 
+    // ------------------------------------------------------------- occupants
+
+    private final Map<String, String> occupants = new java.util.HashMap<>();
+
+    /** Replaces the slot-to-vehicle map (from {@code GET /api/parking/sessions/active}). */
+    public void setOccupants(Map<String, String> vehicleBySlot) {
+        occupants.clear();
+        occupants.putAll(vehicleBySlot);
+        changed();
+    }
+
+    /** Records who is in a slot (from a SLOT_OCCUPIED event), or clears it when {@code vehicle} is null. */
+    public void setOccupant(String slotCode, String vehicle) {
+        if (vehicle == null) {
+            occupants.remove(slotCode);
+        } else {
+            occupants.put(slotCode, vehicle);
+        }
+        changed();
+    }
+
+    /** Vehicle parked in an OCCUPIED slot, if known. */
+    public Optional<String> occupantOf(String slotCode) {
+        SlotInfo s = slots.get(slotCode);
+        return s != null && "OCCUPIED".equals(s.status()) ? Optional.ofNullable(occupants.get(slotCode)) : Optional.empty();
+    }
+
     /** Marks one slot (e.g. the exit operator's vehicle) without making it selectable. */
     public void highlight(String slotCode) {
         highlighted = slotCode;

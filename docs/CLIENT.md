@@ -49,7 +49,7 @@ When the session ends, the app returns to the login screen with an explanation:
 ## Role protection: two layers
 
 1. **Client:** the sidebar only lists permitted screens, and `Navigator.navigate()` checks `AccessPolicy` again before loading anything.
-2. **Server:** every write endpoint checks the token and the role (`401` / `403`). A modified client still cannot do what the role does not allow.
+2. **Server:** every endpoint except sign-in and health checks the token and the role (`401` / `403`), see the RBAC table in [API.md](API.md). A modified client still cannot do what the role does not allow.
 
 ## Screens
 
@@ -59,7 +59,23 @@ When the session ends, the app returns to the login screen with an explanation:
 | Overview | ADMIN | `GET /api/statistics`, `GET /api/slots` | all events; slot events update the map tile directly |
 | Vehicle Entry | ENTRY_OPERATOR, ADMIN | `GET /api/categories`, `GET /api/slots`; `POST /api/parking/entry` | slot events update the map; feed of entries and exits |
 | Vehicle Exit | EXIT_OPERATOR, ADMIN | `GET /api/parking/active/{vehicle}`, `GET /api/parking/sessions/active`, `GET /api/slots`; `POST /api/parking/exit` | map; parked list; details cleared if another gate checks the vehicle out |
+| Parked vehicles | ADMIN | `GET /api/parking/sessions/active` | refreshed on every entry/exit |
+| Parking history | ADMIN | `GET /api/parking/sessions?vehicleNumber=&status=&from=&to=` (paged) | refreshed on every entry/exit |
+| Slot management | ADMIN | `GET /api/slots`, `GET /api/categories`; `POST/PUT /api/slots`, `.../disable`, `.../enable` | refreshed on slot and map events |
+| Users | ADMIN | `GET/POST /api/users`, `PUT .../role`, `.../activate`, `.../deactivate` | refreshed on `ACTIVITY_RECORDED` for user changes |
+| Activity | ADMIN | `GET /api/activity?role=&action=&username=` | new entries prepended live (`ACTIVITY_RECORDED`) |
 | Terminals | ADMIN | `GET /api/realtime/status` | operators connecting/disconnecting |
+
+## Admin dashboard
+
+- **Overview:** seven KPI cards (total, available, occupied and disabled slots, vehicles parked, entries and exits today); a pie chart of slot status (green/red/grey, same colours as the map); a bar chart of entries and exits per hour today (`HourlyTraffic`, unit-tested); the live parking map, whose occupied tiles show the parked vehicle's number; and the live event feed.
+- **Parked vehicles:** every ACTIVE session (vehicle, category, slot, entry time, time parked, ticket, entry operator, notes) with a quick filter. Double-click a row for the full session.
+- **Parking history:** search by vehicle number (normalized like the server), entry date range (both days inclusive) and status, 25 rows per page. **View session** or a double-click opens the session details, including both operators.
+- **Slot management:** add and edit slots (code, type, floor, row, bay, compatible categories or "derive from type"), and disable/enable them after a confirmation. Occupied slots cannot be edited or disabled.
+- **Users:** create operator accounts, assign roles, activate/deactivate. The buttons are disabled on your own row, and the server enforces the same rules (no self-change, never remove the last admin).
+- **Activity:** server-side filters by role, action and user; a bar chart of entries and exits per operator; new activity appears without refreshing.
+
+All admin screens are **live**: they load over REST, then react to WebSocket events with a short debounce, so nothing needs a manual refresh. Forms use the non-blocking `FormDialog`; destructive actions use `ConfirmDialog`.
 
 ## Entry Operator dashboard
 

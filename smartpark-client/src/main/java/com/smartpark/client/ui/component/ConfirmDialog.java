@@ -32,19 +32,35 @@ public final class ConfirmDialog {
     private ConfirmDialog() {
     }
 
+    /** Read-only details window with a single Close button (non-blocking). */
+    public static void info(Window owner, String title, List<String[]> rows) {
+        Stage stage = build(owner, title, null, rows, null, new boolean[1]);
+        stage.show();
+    }
+
     public static boolean ask(Window owner, String title, String message, List<String[]> rows, String confirmText) {
+        boolean[] confirmed = {false};
+        Stage stage = build(owner, title, message, rows, confirmText, confirmed);
+        stage.showAndWait();
+        return confirmed[0];
+    }
+
+    /** @param confirmText null for an information window (Close button only) */
+    private static Stage build(Window owner, String title, String message, List<String[]> rows, String confirmText,
+                               boolean[] confirmed) {
         Stage stage = new Stage();
         stage.initOwner(owner);
         stage.initModality(Modality.WINDOW_MODAL);
         stage.setTitle(title);
         stage.setResizable(false);
-        boolean[] confirmed = {false};
 
         Label heading = new Label(title);
         heading.getStyleClass().add("dialog-title");
         Label text = new Label(message);
         text.getStyleClass().add("muted");
         text.setWrapText(true);
+        text.setVisible(message != null);
+        text.setManaged(message != null);
 
         GridPane grid = new GridPane();
         grid.getStyleClass().add("dialog-details");
@@ -62,19 +78,25 @@ public final class ConfirmDialog {
             grid.addRow(r++, k, v);
         }
 
-        Button cancel = new Button("Cancel");
-        cancel.getStyleClass().add("secondary-button");
+        Button cancel = new Button(confirmText == null ? "Close" : "Cancel");
+        cancel.getStyleClass().add(confirmText == null ? "primary-button" : "secondary-button");
         cancel.setCancelButton(true);
         cancel.setOnAction(e -> stage.close());
-        Button ok = new Button(confirmText);
-        ok.getStyleClass().add("primary-button");
-        ok.setDefaultButton(true);
-        ok.setOnAction(e -> {
-            confirmed[0] = true;
-            stage.close();
-        });
-        HBox buttons = new HBox(10, cancel, ok);
+        HBox buttons = new HBox(10, cancel);
         buttons.setAlignment(Pos.CENTER_RIGHT);
+        Button ok = cancel;
+        if (confirmText != null) {
+            ok = new Button(confirmText);
+            ok.getStyleClass().add("primary-button");
+            ok.setDefaultButton(true);
+            ok.setOnAction(e -> {
+                confirmed[0] = true;
+                stage.close();
+            });
+            buttons.getChildren().add(ok);
+        } else {
+            cancel.setDefaultButton(true);
+        }
 
         VBox root = new VBox(14, heading, text, grid, buttons);
         root.setPadding(new Insets(22, 24, 20, 24));
@@ -85,7 +107,6 @@ public final class ConfirmDialog {
         scene.getStylesheets().add(Objects.requireNonNull(ConfirmDialog.class.getResource(STYLESHEET)).toExternalForm());
         stage.setScene(scene);
         ok.requestFocus();
-        stage.showAndWait();
-        return confirmed[0];
+        return stage;
     }
 }

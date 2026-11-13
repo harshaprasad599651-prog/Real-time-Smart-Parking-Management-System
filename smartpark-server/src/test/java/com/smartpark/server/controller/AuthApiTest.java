@@ -61,7 +61,7 @@ class AuthApiTest extends AbstractApiIntegrationTest {
 
     @Test
     void missingInvalidOrWrongSchemeCredentialsGive401() {
-        get("/api/auth/me").expectProblem(401, "UNAUTHENTICATED");
+        getAnonymous("/api/auth/me").expectProblem(401, "UNAUTHENTICATED");
         getWithToken("/api/auth/me", "not-a-real-token").expectProblem(401, "UNAUTHENTICATED");
         getWithAuthorization("/api/auth/me", "Basic YWRtaW46QWRtaW5AMTIz").expectProblem(401, "UNAUTHENTICATED");
     }

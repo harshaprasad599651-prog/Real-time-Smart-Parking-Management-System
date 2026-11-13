@@ -76,6 +76,7 @@ Every message is one JSON text frame:
 | `PARKING_MAP_UPDATED` | Slot created, edited, disabled or enabled; category created or updated | `reason`, `slot` (**null = reload the whole map**), `categoryName` |
 | `OPERATOR_CONNECTED` | A client connected | `connection` {operator, role, terminal, remoteAddress, connectedAt}, `connectedClients` |
 | `OPERATOR_DISCONNECTED` | A client closed, lost its network, or failed the heartbeat | same, plus `closeReason` |
+| `ACTIVITY_RECORDED` *(control, admins only)* | Any activity-log entry was written (login, logout, entry, exit, slot or user change) | the activity entry {timestamp, username, action, description} |
 | `CONNECTION_ACK` *(control, sequence 0)* | First message on every connection | `serverInstanceId`, `currentSequence`, `replayedEvents`, `resyncRequired`, `resyncReason`, `heartbeatSeconds`, `connectedClients` |
 | `PONG` *(control)* | Reply to a text `PING` | – |
 

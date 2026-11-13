@@ -23,6 +23,7 @@ module com.smartpark.client {
     opens com.smartpark.client.ui.dashboard to javafx.fxml;
     opens com.smartpark.client.ui.connections to javafx.fxml;
     opens com.smartpark.client.ui.parking to javafx.fxml;
+    opens com.smartpark.client.ui.admin to javafx.fxml;
     opens com.smartpark.client.ui.common to javafx.fxml;
 
     // Jackson creates the JSON records by reflection

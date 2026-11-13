@@ -31,12 +31,22 @@ public final class SlotMapView extends VBox {
 
     private final SlotMapModel model;
     private final boolean selectable;
+    private final boolean showOccupants;
 
     /** @param selectable true on the entry screen (tiles can be picked), false for read-only maps */
     public SlotMapView(SlotMapModel model, boolean selectable) {
+        this(model, selectable, false);
+    }
+
+    /**
+     * @param showOccupants true on the admin map: occupied tiles show the parked vehicle's number
+     *                      instead of the slot type
+     */
+    public SlotMapView(SlotMapModel model, boolean selectable, boolean showOccupants) {
         super(18);
         this.model = model;
         this.selectable = selectable;
+        this.showOccupants = showOccupants;
         getStyleClass().add("slot-map");
         model.addListener(this::render);
         render();
@@ -72,17 +82,22 @@ public final class SlotMapView extends VBox {
         TileState state = model.stateOf(s.slotCode());
         Label code = new Label(s.slotCode());
         code.getStyleClass().add("tile-code");
-        Label type = new Label(shortType(s.slotType()));
-        type.getStyleClass().add("tile-type");
+        String occupant = showOccupants ? model.occupantOf(s.slotCode()).orElse(null) : null;
+        Label type = new Label(occupant != null ? occupant : shortType(s.slotType()));
+        type.getStyleClass().add(occupant != null ? "tile-vehicle" : "tile-type");
         VBox content = new VBox(1, code, type);
         content.setAlignment(Pos.CENTER);
 
         Button b = new Button();
         b.setGraphic(content);
         b.getStyleClass().addAll("slot-tile", "slot-" + state.name().toLowerCase(Locale.ROOT).replace('_', '-'));
+        if (showOccupants) {
+            b.getStyleClass().add("slot-tile-wide");
+        }
         b.setAccessibleText(s.slotCode());   // screen readers and UI automation see "A-01"
         b.setFocusTraversable(selectable && state == TileState.FREE);
         b.setTooltip(new Tooltip(s.slotCode() + " · " + s.slotType().replace('_', ' ') + " · " + s.status()
+                + (occupant != null ? "\nVehicle: " + occupant + " · ticket " + s.currentTicketId() : "")
                 + "\nAccepts: " + String.join(", ", s.supportedVehicleCategories())));
         if (selectable) {
             b.setOnAction(e -> model.select(s.slotCode()));

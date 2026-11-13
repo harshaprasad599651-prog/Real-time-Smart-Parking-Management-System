@@ -85,6 +85,20 @@ public class ApiClient implements AutoCloseable {
         return send(withJson(builder(path), body), false).thenApply(text -> json.readValue(text, type));
     }
 
+    /** {@code PUT path} with a JSON body. */
+    public <T> CompletableFuture<T> put(String path, Object body, Class<T> type) {
+        String text = json.writeValueAsString(body);
+        HttpRequest.Builder b = builder(path).header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(text));
+        return send(b, true).thenApply(t -> json.readValue(t, type));
+    }
+
+    /** GET on behalf of an explicit token (used by tools that act as several operators at once). */
+    public <T> CompletableFuture<T> getAs(String token, String path, Class<T> type) {
+        HttpRequest.Builder b = builder(path).header("Authorization", "Bearer " + token).GET();
+        return send(b, false).thenApply(text -> json.readValue(text, type));
+    }
+
     /** Empty POST with an explicit token and no unauthorized hook (used for logout). */
     public CompletableFuture<Void> postWithToken(String path, String token) {
         HttpRequest.Builder b = withJson(builder(path), null).header("Authorization", "Bearer " + token);

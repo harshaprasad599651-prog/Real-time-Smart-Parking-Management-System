@@ -1,5 +1,7 @@
 package com.smartpark.server.controller;
 
+import com.smartpark.server.document.UserRole;
+import com.smartpark.server.security.RequireRole;
 import com.smartpark.server.websocket.RealtimeHub;
 import com.smartpark.server.websocket.RealtimePayloads.RealtimeStatus;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/realtime")
 @Tag(name = "Monitoring")
+@RequireRole(UserRole.ADMIN)
 public class RealtimeController {
 
     private final RealtimeHub hub;

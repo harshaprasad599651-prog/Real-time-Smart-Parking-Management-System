@@ -40,8 +40,14 @@ class AccessPolicyTest {
 
     @Test
     void sidebarShowsOnlyAllowedScreens() {
-        assertEquals(java.util.List.of(ADMIN_DASHBOARD, VEHICLE_ENTRY, VEHICLE_EXIT, CONNECTIONS),
+        assertEquals(java.util.List.of(ADMIN_DASHBOARD, View.PARKED_VEHICLES, View.PARKING_HISTORY,
+                        View.SLOT_MANAGEMENT, View.USER_MANAGEMENT, View.ACTIVITY_LOG, CONNECTIONS, VEHICLE_ENTRY, VEHICLE_EXIT),
                 AccessPolicy.sidebarViews(UserRole.ADMIN));
+        for (View adminOnly : java.util.List.of(View.PARKED_VEHICLES, View.PARKING_HISTORY, View.SLOT_MANAGEMENT,
+                View.USER_MANAGEMENT, View.ACTIVITY_LOG, CONNECTIONS)) {
+            assertFalse(AccessPolicy.canAccess(UserRole.ENTRY_OPERATOR, adminOnly), adminOnly.name());
+            assertFalse(AccessPolicy.canAccess(UserRole.EXIT_OPERATOR, adminOnly), adminOnly.name());
+        }
         assertEquals(java.util.List.of(VEHICLE_ENTRY), AccessPolicy.sidebarViews(UserRole.ENTRY_OPERATOR));
         assertEquals(java.util.List.of(VEHICLE_EXIT), AccessPolicy.sidebarViews(UserRole.EXIT_OPERATOR));
         assertFalse(AccessPolicy.sidebarViews(UserRole.ADMIN).contains(ACCESS_DENIED));

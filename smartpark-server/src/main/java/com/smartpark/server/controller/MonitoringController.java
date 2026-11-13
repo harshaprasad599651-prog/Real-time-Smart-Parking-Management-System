@@ -1,5 +1,8 @@
 package com.smartpark.server.controller;
 
+import com.smartpark.server.document.ActivityAction;
+import com.smartpark.server.document.UserRole;
+import com.smartpark.server.security.RequireRole;
 import com.smartpark.server.dto.ActivityLogDto;
 import com.smartpark.server.dto.ParkingStatisticsDto;
 import com.smartpark.server.service.ActivityLogService;
@@ -37,15 +40,20 @@ public class MonitoringController {
         return statisticsService.statistics();
     }
 
+    @RequireRole(UserRole.ADMIN)
     @GetMapping("/activity")
-    @Operation(summary = "Recent operator activity", description = "Newest first; optionally for one user.")
+    @Operation(summary = "Operator activity (ADMIN)",
+            description = "Newest first. Optional filters: one user, all users with a role (e.g. ENTRY_OPERATOR), "
+                    + "one action (e.g. VEHICLE_EXIT). New entries are also pushed live to admin terminals "
+                    + "as ACTIVITY_RECORDED WebSocket messages.")
     @ApiErrorResponses.Ok
     @ApiErrorResponses.BadRequest
+    @ApiErrorResponses.Forbidden
     public List<ActivityLogDto> activity(
             @Parameter(example = "entry1") @RequestParam(required = false) String username,
+            @Parameter(description = "Only users with this role") @RequestParam(required = false) UserRole role,
+            @Parameter(description = "Only this action") @RequestParam(required = false) ActivityAction action,
             @Parameter(description = "Maximum entries (1-500)") @RequestParam(defaultValue = "50") @Min(1) @Max(500) int limit) {
-        return username == null || username.isBlank()
-                ? activityLogService.recent(limit)
-                : activityLogService.recentForUser(username.trim().toLowerCase(java.util.Locale.ROOT), limit);
+        return activityLogService.search(username, role, action, limit);
     }
 }

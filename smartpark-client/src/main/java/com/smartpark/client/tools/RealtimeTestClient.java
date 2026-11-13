@@ -118,7 +118,7 @@ public final class RealtimeTestClient {
 
             // 1. Park a vehicle
             String vehicle = "DEMO" + ThreadLocalRandom.current().nextInt(1000, 10000);
-            JsonNode available = api.get("/api/slots/available?category=CAR", JsonNode.class).join();
+            JsonNode available = api.getAs(tokens.get("entry1"), "/api/slots/available?category=CAR", JsonNode.class).join();
             if (available.isEmpty()) {
                 throw new IllegalStateException("No AVAILABLE slot for CAR - free one and try again");
             }

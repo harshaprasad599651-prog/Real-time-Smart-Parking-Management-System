@@ -4,6 +4,7 @@ package com.smartpark.server.document;
 public enum ActivityAction {
     USER_CREATED,
     USER_STATUS_CHANGED,
+    USER_ROLE_CHANGED,
     LOGIN_SUCCESS,
     LOGIN_FAILED,
     LOGOUT,

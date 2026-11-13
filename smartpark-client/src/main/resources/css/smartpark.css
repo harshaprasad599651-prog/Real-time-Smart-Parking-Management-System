@@ -430,6 +430,52 @@
 }
 .legend-text { -fx-text-fill: -sp-muted; -fx-font-size: 12px; }
 
+/* ============================== Admin ================================== */
+
+/* Admin map: wider tiles so the parked vehicle's number fits */
+.slot-tile-wide {
+    -fx-min-width: 86; -fx-pref-width: 86; -fx-max-width: 86;
+}
+.tile-vehicle { -fx-font-size: 10px; -fx-font-weight: bold; -fx-font-family: "Consolas", monospace; }
+
+/* Badges inside tables */
+.table-badge {
+    -fx-font-size: 10.5px;
+    -fx-font-weight: bold;
+    -fx-padding: 2 8;
+    -fx-background-radius: 10;
+}
+.badge-green  { -fx-background-color: -sp-green-bg; -fx-text-fill: #15803d; }
+.badge-red    { -fx-background-color: -sp-red-bg;   -fx-text-fill: #b91c1c; }
+.badge-blue   { -fx-background-color: -sp-blue-bg;  -fx-text-fill: -sp-blue-dk; }
+.badge-grey   { -fx-background-color: #e5e7eb;      -fx-text-fill: #4b5563; }
+.badge-purple { -fx-background-color: #ede9fe;      -fx-text-fill: #6d28d9; }
+
+/* Charts: same colours as the map (green available, red occupied, grey disabled) */
+.chart { -fx-padding: 4; }
+.chart-plot-background { -fx-background-color: transparent; }
+.chart-vertical-grid-lines { -fx-stroke: transparent; }
+.chart-horizontal-grid-lines { -fx-stroke: #eef2f7; }
+.axis { -fx-tick-label-fill: -sp-muted; -fx-tick-label-font-size: 11px; }
+.chart-legend { -fx-background-color: transparent; }
+.chart-legend-item { -fx-text-fill: -sp-text-2; }
+
+.status-pie .data0.chart-pie, .status-pie .data0.pie-legend-symbol { -fx-pie-color: #16a34a; -fx-background-color: #16a34a; }
+.status-pie .data1.chart-pie, .status-pie .data1.pie-legend-symbol { -fx-pie-color: #dc2626; -fx-background-color: #dc2626; }
+.status-pie .data2.chart-pie, .status-pie .data2.pie-legend-symbol { -fx-pie-color: #9ca3af; -fx-background-color: #9ca3af; }
+.status-pie .chart-pie { -fx-border-color: white; -fx-border-width: 2; }
+
+.traffic-chart .default-color0.chart-bar { -fx-bar-fill: #2563eb; }
+.traffic-chart .default-color1.chart-bar { -fx-bar-fill: #16a34a; }
+.traffic-chart .default-color0.chart-legend-item-symbol { -fx-background-color: #2563eb; }
+.traffic-chart .default-color1.chart-legend-item-symbol { -fx-background-color: #16a34a; }
+
+/* Form controls used in admin dialogs */
+.dialog-root .text-field, .dialog-root .password-field {
+    -fx-background-radius: 6; -fx-border-radius: 6; -fx-border-color: #cbd5e1; -fx-background-color: white; -fx-padding: 6 8;
+}
+.date-picker .text-field { -fx-background-color: white; }
+
 /* Exit: status badge and result card */
 .status-badge {
     -fx-background-color: -sp-blue-bg;

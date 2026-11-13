@@ -1,5 +1,6 @@
 package com.smartpark.server.controller;
 
+import com.smartpark.server.security.PublicEndpoint;
 import com.smartpark.server.document.ActivityAction;
 import com.smartpark.server.dto.LoginRequest;
 import com.smartpark.server.dto.LoginResponse;
@@ -42,6 +43,7 @@ public class AuthController {
         this.activityLog = activityLog;
     }
 
+    @PublicEndpoint
     @PostMapping("/login")
     @SecurityRequirements // no token needed to log in
     @Operation(summary = "Sign in",

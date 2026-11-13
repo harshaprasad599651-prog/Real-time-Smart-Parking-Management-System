@@ -84,6 +84,32 @@ public final class ApiDtos {
     public record ExitRequest(String vehicleNumber) {
     }
 
+    // ------------------------------------------------------------ admin
+
+    /** One activity-log entry ({@code GET /api/activity}, and the payload of ACTIVITY_RECORDED). */
+    public record ActivityEntry(String id, String username, String action, String description, Instant timestamp) {
+    }
+
+    public record CreateUserRequest(String username, String password, UserRole role) {
+        @Override
+        public String toString() {
+            return "CreateUserRequest[" + username + ", " + role + "]"; // never print the password
+        }
+    }
+
+    public record ChangeRoleRequest(UserRole role) {
+    }
+
+    /** Body of {@code POST /api/slots}; empty categories = derived from the slot type. */
+    public record CreateSlotRequest(String slotCode, String slotType, List<String> supportedVehicleCategories,
+                                    int floor, String row, int column) {
+    }
+
+    /** Body of {@code PUT /api/slots/{code}}. */
+    public record UpdateSlotRequest(String slotType, List<String> supportedVehicleCategories,
+                                    int floor, String row, int column) {
+    }
+
     /** A page of parking sessions ({@code GET /api/parking/sessions?...}). */
     public record SessionPage(List<ParkingSession> content, int page, int size, long totalElements, int totalPages) {
     }

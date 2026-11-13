@@ -30,4 +30,8 @@ public sealed interface ParkingDomainEvent {
     record ParkingMapChanged(String reason, ParkingSlotDto slot, String categoryName, String actor)
             implements ParkingDomainEvent {
     }
+
+    /** An entry was written to the activity log (pushed live to admin terminals only). */
+    record ActivityRecorded(com.smartpark.server.dto.ActivityLogDto entry, String actor) implements ParkingDomainEvent {
+    }
 }

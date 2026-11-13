@@ -1,5 +1,7 @@
 package com.smartpark.server.controller;
 
+import com.smartpark.server.document.UserRole;
+import com.smartpark.server.security.RequireRole;
 import com.smartpark.server.document.SlotStatus;
 import com.smartpark.server.dto.CreateParkingSlotRequest;
 import com.smartpark.server.dto.ParkingSlotDto;
@@ -74,6 +76,7 @@ public class ParkingSlotController {
         return slotService.getSlot(slotCode);
     }
 
+    @RequireRole(UserRole.ADMIN)
     @PostMapping
     @Operation(summary = "Add a parking slot (ADMIN)",
             description = "If supportedVehicleCategories is omitted it is derived from the categories whose "
@@ -92,6 +95,7 @@ public class ParkingSlotController {
         return ResponseEntity.created(location).body(created);
     }
 
+    @RequireRole(UserRole.ADMIN)
     @PutMapping("/{slotCode}")
     @Operation(summary = "Update a parking slot (ADMIN)",
             description = "Replaces type, supported categories and position. Rejected with 409 while the slot is "
@@ -109,6 +113,7 @@ public class ParkingSlotController {
         return slotService.updateSlot(slotCode, request, admin);
     }
 
+    @RequireRole(UserRole.ADMIN)
     @PostMapping("/{slotCode}/disable")
     @Operation(summary = "Disable a slot (ADMIN)",
             description = "AVAILABLE -> DISABLED as one atomic conditional update. An OCCUPIED slot cannot be disabled (409).")
@@ -123,6 +128,7 @@ public class ParkingSlotController {
         return slotService.disableSlot(slotCode, admin);
     }
 
+    @RequireRole(UserRole.ADMIN)
     @PostMapping("/{slotCode}/enable")
     @Operation(summary = "Re-enable a disabled slot (ADMIN)", description = "DISABLED -> AVAILABLE, atomically.")
     @ApiErrorResponses.Ok

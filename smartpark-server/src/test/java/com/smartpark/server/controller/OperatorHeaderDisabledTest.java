@@ -24,8 +24,13 @@ class OperatorHeaderDisabledTest extends AbstractApiIntegrationTest {
     }
 
     @Test
-    void readOnlyEndpointsStayOpen() {
-        get("/api/slots").expect(200);
-        get("/api/statistics").expect(200);
+    void readEndpointsRequireASignedInUser() {
+        getAnonymous("/api/slots").expectProblem(401, "UNAUTHENTICATED");
+        getAnonymous("/api/statistics").expectProblem(401, "UNAUTHENTICATED");
+        getAnonymous("/api/health").expect(200);  // public
+
+        String token = login("entry1", "Entry@123");
+        getWithToken("/api/slots", token).expect(200);
+        getWithToken("/api/statistics", token).expect(200);
     }
 }

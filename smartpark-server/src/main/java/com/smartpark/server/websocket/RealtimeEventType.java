@@ -29,7 +29,9 @@ public enum RealtimeEventType {
     /** First message after connecting: server instance, current sequence, replay/resync information. */
     CONNECTION_ACK(false),
     /** Reply to an application-level {@code PING} text message. */
-    PONG(false);
+    PONG(false),
+    /** A new activity-log entry; sent to ADMIN connections only (not sequenced, not replayed). */
+    ACTIVITY_RECORDED(false);
 
     private final boolean broadcast;
 

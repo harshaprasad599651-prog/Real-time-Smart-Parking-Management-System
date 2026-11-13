@@ -2,6 +2,7 @@ package com.smartpark.client.app;
 
 import com.smartpark.client.config.ClientConfig;
 import com.smartpark.client.net.ApiClient;
+import com.smartpark.client.service.AdminService;
 import com.smartpark.client.service.ParkingService;
 import com.smartpark.client.service.RealtimeService;
 import com.smartpark.client.session.SessionManager;
@@ -14,7 +15,8 @@ import com.smartpark.client.session.SessionManager;
  *   ApiClient        REST calls (Java HttpClient + Jackson), adds the bearer token
  *   SessionManager   login / logout / current user
  *   RealtimeService  WebSocket connection, events and connection status for the UI
- *   ParkingService   parking operations (slots, categories, entry) on top of ApiClient
+ *   ParkingService   parking operations (slots, categories, entry, exit) on top of ApiClient
+ *   AdminService     admin operations (history, slot and user management, activity)
  * </pre>
  */
 public final class AppContext implements AutoCloseable {
@@ -24,6 +26,7 @@ public final class AppContext implements AutoCloseable {
     private final SessionManager session;
     private final RealtimeService realtime;
     private final ParkingService parking;
+    private final AdminService admin;
 
     public AppContext(ClientConfig config) {
         this.config = config;
@@ -31,6 +34,7 @@ public final class AppContext implements AutoCloseable {
         this.session = new SessionManager(api, config.terminalName());
         this.realtime = new RealtimeService(config);
         this.parking = new ParkingService(api);
+        this.admin = new AdminService(api);
     }
 
     public ClientConfig config() {
@@ -51,6 +55,10 @@ public final class AppContext implements AutoCloseable {
 
     public ParkingService parking() {
         return parking;
+    }
+
+    public AdminService admin() {
+        return admin;
     }
 
     @Override

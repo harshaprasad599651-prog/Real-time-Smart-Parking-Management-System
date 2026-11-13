@@ -1,5 +1,7 @@
 package com.smartpark.server.controller;
 
+import com.smartpark.server.document.UserRole;
+import com.smartpark.server.security.RequireRole;
 import com.smartpark.server.document.SessionStatus;
 import com.smartpark.server.dto.ExitLookupResponse;
 import com.smartpark.server.dto.PageResponse;
@@ -43,6 +45,7 @@ public class ParkingController {
 
     // ------------------------------------------------------------------ entry
 
+    @RequireRole({UserRole.ENTRY_OPERATOR, UserRole.ADMIN})
     @PostMapping("/entry")
     @Operation(summary = "Register a vehicle entry (ENTRY_OPERATOR or ADMIN)",
             description = """
@@ -70,6 +73,7 @@ public class ParkingController {
 
     // ------------------------------------------------------------------- exit
 
+    @RequireRole({UserRole.EXIT_OPERATOR, UserRole.ADMIN})
     @GetMapping("/active/{vehicleNumber}")
     @Operation(summary = "Find the active session of a vehicle (exit gate search)",
             description = "Returns the vehicle's ACTIVE session, its assigned slot and the minutes parked so far. "
@@ -81,6 +85,7 @@ public class ParkingController {
         return sessionService.lookupForExit(vehicleNumber);
     }
 
+    @RequireRole({UserRole.EXIT_OPERATOR, UserRole.ADMIN})
     @PostMapping("/exit")
     @Operation(summary = "Confirm a vehicle departure (EXIT_OPERATOR or ADMIN)",
             description = "Atomically marks the ACTIVE session COMPLETED, stores the exit time and releases the slot. "
@@ -103,6 +108,7 @@ public class ParkingController {
         return sessionService.listActiveSessions();
     }
 
+    @RequireRole({UserRole.EXIT_OPERATOR, UserRole.ADMIN})
     @GetMapping("/sessions")
     @Operation(summary = "Search historical parking records",
             description = "Paged, newest entry first. All filters are optional; from/to filter on entry time "
