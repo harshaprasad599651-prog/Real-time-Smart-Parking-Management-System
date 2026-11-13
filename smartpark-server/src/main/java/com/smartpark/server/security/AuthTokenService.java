@@ -4,7 +4,9 @@ import com.smartpark.server.document.LoginSession;
 import com.smartpark.server.document.UserRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -64,11 +66,19 @@ public class AuthTokenService {
     private final Duration idleTimeout;
     private final MongoTemplate mongoTemplate;
     private final Map<String, Cached> sessionsByHash = new ConcurrentHashMap<>();
+    private final ApplicationEventPublisher events;
 
+    @Autowired
     public AuthTokenService(@Value("${smartpark.security.token-idle-timeout:PT12H}") Duration idleTimeout,
-                            MongoTemplate mongoTemplate) {
+                            MongoTemplate mongoTemplate, ApplicationEventPublisher events) {
         this.idleTimeout = idleTimeout;
         this.mongoTemplate = mongoTemplate;
+        this.events = events;
+    }
+
+    /** Without event publishing (tests). */
+    AuthTokenService(Duration idleTimeout, MongoTemplate mongoTemplate) {
+        this(idleTimeout, mongoTemplate, event -> { });
     }
 
     public IssuedToken issue(String username, UserRole role, String terminal) {
@@ -123,12 +133,16 @@ public class AuthTokenService {
         return cached || stored;
     }
 
-    /** Signs a user out everywhere (e.g. after the account is deactivated or its role changed). */
+    /**
+     * Signs a user out everywhere (e.g. after the account is deactivated or its role changed):
+     * REST tokens stop working at once and open WebSocket connections are closed.
+     */
     public int revokeAll(String username) {
         int before = sessionsByHash.size();
         sessionsByHash.values().removeIf(c -> c.session().username().equals(username));
         long stored = mongoTemplate.remove(Query.query(Criteria.where(LoginSession.F_USERNAME).is(username)),
                 LoginSession.class).getDeletedCount();
+        events.publishEvent(new SignInsRevoked(username, "Signed out by an administrator"));
         return (int) Math.max(stored, before - sessionsByHash.size());
     }
 

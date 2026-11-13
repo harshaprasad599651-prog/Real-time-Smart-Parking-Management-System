@@ -49,6 +49,17 @@ public final class WsTestClient implements WebSocket.Listener, AutoCloseable {
         return client;
     }
 
+    /** Connects with a real bearer token, as the desktop client does. */
+    public static WsTestClient connectWithToken(int port, String token, String terminal) throws Exception {
+        WsTestClient client = new WsTestClient();
+        client.webSocket = HttpClient.newHttpClient().newWebSocketBuilder()
+                .header("Authorization", "Bearer " + token)
+                .connectTimeout(Duration.ofSeconds(5))
+                .buildAsync(URI.create("ws://localhost:" + port + "/ws?terminal=" + enc(terminal)), client)
+                .get(10, TimeUnit.SECONDS);
+        return client;
+    }
+
     // ------------------------------------------------------------- listener
 
     @Override

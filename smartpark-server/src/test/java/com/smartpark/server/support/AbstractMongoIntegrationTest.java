@@ -1,5 +1,6 @@
 package com.smartpark.server.support;
 
+import com.smartpark.server.security.LoginAttemptLimiter;
 import com.smartpark.server.bootstrap.DataSeeder;
 import com.smartpark.server.persistence.MongoIndexInitializer;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,12 +35,16 @@ public abstract class AbstractMongoIntegrationTest {
     @Autowired
     protected DataSeeder dataSeeder;
 
+    @Autowired
+    protected LoginAttemptLimiter loginAttemptLimiter;
+
     @DynamicPropertySource
     static void mongoProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.mongodb.uri", MongoAvailableCondition::testUri);
         registry.add("spring.mongodb.database", () -> TEST_DATABASE);
         registry.add("smartpark.seed.enabled", () -> "false");
         registry.add("smartpark.parking.reconcile-enabled", () -> "false");
+        registry.add("smartpark.security.bcrypt-strength", () -> "4"); // fast hashing in tests
     }
 
     @BeforeEach
@@ -50,6 +55,7 @@ public abstract class AbstractMongoIntegrationTest {
             }
         }
         indexInitializer.ensureIndexes();
+        loginAttemptLimiter.clear();
     }
 
     /** Loads the standard sample users, categories and 30 slots. */

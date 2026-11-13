@@ -61,7 +61,7 @@ public class VehicleCategoryService {
         }
         VehicleCategory category;
         try {
-            category = repository.insert(new VehicleCategory(name, request.description(), request.compatibleSlotTypes()));
+            category = repository.insert(new VehicleCategory(name, Normalizer.freeText(request.description(), 200), request.compatibleSlotTypes()));
         } catch (DuplicateKeyException e) {
             throw new DuplicateResourceException("Vehicle category '" + name + "' already exists", e);
         }
@@ -90,7 +90,7 @@ public class VehicleCategoryService {
         VehicleCategory updated = transactionRunner.execute(inTransaction -> {
             VehicleCategory before = mongoTemplate.findAndModify(
                     query(where(VehicleCategory.F_CATEGORY_NAME).is(name)),
-                    new Update().set(VehicleCategory.F_DESCRIPTION, request.description())
+                    new Update().set(VehicleCategory.F_DESCRIPTION, Normalizer.freeText(request.description(), 200))
                             .set(VehicleCategory.F_COMPATIBLE_SLOT_TYPES, newTypes),
                     options().returnNew(false), VehicleCategory.class);
             if (before == null) {
@@ -112,7 +112,7 @@ public class VehicleCategoryService {
                         new Update().pull(ParkingSlot.F_SUPPORTED_CATEGORIES, name).inc(ParkingSlot.F_VERSION, 1),
                         ParkingSlot.class);
             }
-            before.setDescription(request.description());
+            before.setDescription(Normalizer.freeText(request.description(), 200));
             before.setCompatibleSlotTypes(newTypes);
             return before;
         });

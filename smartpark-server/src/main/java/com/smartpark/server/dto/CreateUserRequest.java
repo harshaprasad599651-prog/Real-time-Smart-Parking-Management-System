@@ -14,6 +14,7 @@ public record CreateUserRequest(
 
         // BCrypt only uses the first 72 bytes of a password
         @NotBlank @Size(min = 8, max = 72)
+        @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*[0-9]).*$", message = "must contain at least one letter and one digit")
         String password,
 
         @NotNull

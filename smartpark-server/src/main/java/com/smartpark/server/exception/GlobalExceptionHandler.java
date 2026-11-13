@@ -73,6 +73,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(status, code, e.getMessage(), request);
     }
 
+    @ExceptionHandler(TooManyLoginAttemptsException.class)
+    ResponseEntity<ProblemDetail> handleTooManyLogins(TooManyLoginAttemptsException e, WebRequest request) {
+        ProblemDetail pd = problem(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_LOGIN_ATTEMPTS", e.getMessage(), request);
+        long seconds = Math.max(1, e.retryAfter().toSeconds());
+        pd.setProperty("retryAfterSeconds", seconds);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(seconds)).body(pd);
+    }
+
+    /** A unique index caught a duplicate that slipped past the service checks (e.g. a race). */
+    @ExceptionHandler(org.springframework.dao.DuplicateKeyException.class)
+    ProblemDetail handleDuplicateKey(org.springframework.dao.DuplicateKeyException e, WebRequest request) {
+        log.warn("Duplicate key on {}: {}", path(request), e.getMostSpecificCause().getMessage());
+        return problem(HttpStatus.CONFLICT, "DUPLICATE_RESOURCE",
+                "This record already exists or was just created by another operator.", request);
+    }
+
     @ExceptionHandler(OptimisticLockingFailureException.class)
     ProblemDetail handleOptimisticLock(OptimisticLockingFailureException e, WebRequest request) {
         return problem(HttpStatus.CONFLICT, "CONCURRENT_UPDATE",
@@ -129,8 +146,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     // ------------------------------------------------------- infrastructure
 
-    @ExceptionHandler(DataAccessResourceFailureException.class)
-    ProblemDetail handleDatabaseDown(DataAccessResourceFailureException e, WebRequest request) {
+    /**
+     * MongoDB unreachable, timed out, or refusing the login: 503 with a clear message, never a
+     * stack trace. Clients keep their state and retry; nothing was half-saved (each operation is
+     * one atomic update, a transaction, or is compensated).
+     */
+    @ExceptionHandler({DataAccessResourceFailureException.class,
+            org.springframework.dao.TransientDataAccessException.class,
+            org.springframework.data.mongodb.UncategorizedMongoDbException.class,
+            com.mongodb.MongoTimeoutException.class, com.mongodb.MongoSocketException.class,
+            com.mongodb.MongoSecurityException.class})
+    ProblemDetail handleDatabaseDown(Exception e, WebRequest request) {
         log.error("Database unavailable: {}", e.getMessage());
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "DATABASE_UNAVAILABLE",
                 "The database is not reachable. Please try again shortly.", request);

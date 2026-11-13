@@ -93,8 +93,11 @@ public class LoginController {
         serverStatus.getStyleClass().setAll("label", "server-status", "state-pending");
         context.api().get("/api/health", Health.class).whenComplete((health, error) -> Platform.runLater(() -> {
             boolean up = error == null && "UP".equals(health.status());
-            serverStatus.setText(up ? "Online" : "Unreachable");
-            serverStatus.getStyleClass().setAll("label", "server-status", up ? "state-online" : "state-offline");
+            // 503 = the server answered but its database is down (sign-in would fail)
+            boolean databaseDown = error != null && ApiClient.unwrap(error).status() == 503;
+            serverStatus.setText(up ? "Online" : databaseDown ? "Database unavailable" : "Unreachable");
+            serverStatus.getStyleClass().setAll("label", "server-status",
+                    up ? "state-online" : databaseDown ? "state-pending" : "state-offline");
         }));
     }
 

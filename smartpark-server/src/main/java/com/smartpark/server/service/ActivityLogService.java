@@ -53,7 +53,10 @@ public class ActivityLogService {
 
     public void record(String username, ActivityAction action, String description) {
         try {
-            ActivityLog saved = repository.save(new ActivityLog(username, action, description, Instant.now()));
+            // Usernames of failed sign-ins and descriptions may contain text typed by a client:
+            // strip line breaks and control characters so log entries cannot be forged.
+            ActivityLog saved = repository.save(new ActivityLog(Normalizer.label(username, 60, "?"), action,
+                    Normalizer.freeText(description, 500), Instant.now()));
             eventPublisher.publishEvent(new ParkingDomainEvent.ActivityRecorded(ActivityLogDto.from(saved), username));
         } catch (RuntimeException e) {
             log.warn("Could not write activity log [{} {} {}]: {}", username, action, description, e.getMessage());

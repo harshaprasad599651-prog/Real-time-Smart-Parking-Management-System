@@ -1,5 +1,7 @@
 package com.smartpark.server.websocket;
 
+import com.smartpark.server.security.SignInsRevoked;
+import org.springframework.context.event.EventListener;
 import com.smartpark.server.document.UserRole;
 import com.smartpark.server.websocket.RealtimePayloads.ConnectionAck;
 import com.smartpark.server.websocket.RealtimePayloads.ConnectionInfo;
@@ -128,8 +130,10 @@ public class RealtimeHub {
         ClientConnection previous = null;
         synchronized (lock) {
             // One live connection per client process: a reconnect replaces a half-open old connection.
+            // Only the SAME operator may replace it: client ids are visible in presence events,
+            // so matching on the id alone would let one operator disconnect another.
             for (ClientConnection existing : clients.values()) {
-                if (existing.clientId().equals(clientId)) {
+                if (existing.clientId().equals(clientId) && existing.operator().equals(operator)) {
                     previous = existing;
                 }
             }
@@ -235,6 +239,30 @@ public class RealtimeHub {
 
     public String serverInstanceId() {
         return serverInstanceId;
+    }
+
+    /**
+     * Closes every live connection of {@code operator}, e.g. after the account was deactivated
+     * or its role changed. The client then tries to reconnect, the handshake is refused (its
+     * token was revoked) and it returns to the login screen.
+     *
+     * @return number of connections closed
+     */
+    public int disconnectOperator(String operator, String reason) {
+        List<ClientConnection> victims;
+        synchronized (lock) {
+            victims = clients.values().stream().filter(c -> c.operator().equals(operator)).toList();
+        }
+        victims.forEach(c -> c.close(CloseStatus.POLICY_VIOLATION.withReason(reason)));
+        if (!victims.isEmpty()) {
+            log.info("Closed {} realtime connection(s) of {}: {}", victims.size(), operator, reason);
+        }
+        return victims.size();
+    }
+
+    @EventListener
+    void onSignInsRevoked(SignInsRevoked event) {
+        disconnectOperator(event.username(), event.reason());
     }
 
     @PreDestroy

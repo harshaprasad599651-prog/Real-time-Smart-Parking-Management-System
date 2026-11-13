@@ -1,5 +1,9 @@
 package com.smartpark.server.websocket;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import org.springframework.util.LinkedMultiValueMap;
+import com.smartpark.server.util.Normalizer;
 import com.smartpark.server.dto.UserDto;
 import com.smartpark.server.exception.UnauthenticatedException;
 import com.smartpark.server.security.AuthenticatedOperator;
@@ -57,7 +61,10 @@ public class RealtimeHandshakeInterceptor implements HandshakeInterceptor {
     @Override
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                    WebSocketHandler wsHandler, Map<String, Object> attributes) {
-        MultiValueMap<String, String> params = UriComponentsBuilder.fromUri(request.getURI()).build().getQueryParams();
+        // getQueryParams() returns the raw, still URL-encoded values: decode them ("ENTRY%20GATE" -> "ENTRY GATE").
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        UriComponentsBuilder.fromUri(request.getURI()).build().getQueryParams().forEach((k, values) ->
+                values.forEach(v -> params.add(k, v == null ? null : URLDecoder.decode(v, StandardCharsets.UTF_8))));
         String authorization = Optional.ofNullable(request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION))
                 .orElseGet(() -> params.getFirst("access_token") == null ? null : "Bearer " + params.getFirst("access_token"));
         String operatorHeader = Optional.ofNullable(request.getHeaders().getFirst(RequestAuthenticator.OPERATOR_HEADER))
@@ -81,10 +88,11 @@ public class RealtimeHandshakeInterceptor implements HandshakeInterceptor {
 
         attributes.put(ATTR_OPERATOR, user.get().username());
         attributes.put(ATTR_ROLE, user.get().role());
-        attributes.put(ATTR_TERMINAL, Optional.ofNullable(params.getFirst("terminal")).orElse("UNKNOWN"));
-        attributes.put(ATTR_CLIENT_ID, Optional.ofNullable(params.getFirst("clientId"))
+        // Client-chosen values are shown to every admin: keep them short and printable.
+        attributes.put(ATTR_TERMINAL, Normalizer.label(params.getFirst("terminal"), 40, "UNKNOWN"));
+        attributes.put(ATTR_CLIENT_ID, Optional.ofNullable(Normalizer.clientId(params.getFirst("clientId")))
                 .orElse(UUID.randomUUID().toString()));
-        attributes.put(ATTR_INSTANCE, params.getFirst("instance"));
+        attributes.put(ATTR_INSTANCE, Normalizer.label(params.getFirst("instance"), 40, null));
         String since = params.getFirst("since");
         if (since != null) {
             try {

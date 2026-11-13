@@ -1,5 +1,6 @@
 package com.smartpark.server.document;
 
+import com.smartpark.server.util.Normalizer;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -67,7 +68,7 @@ public class ParkingSession {
     public static ParkingSession start(String ticketId, String vehicleNumber, String vehicleCategory,
                                        String parkingSlotCode, Instant entryTime, String entryOperator, String notes) {
         ParkingSession s = start(ticketId, vehicleNumber, vehicleCategory, parkingSlotCode, entryTime, entryOperator);
-        s.notes = notes == null || notes.isBlank() ? null : notes.trim();
+        s.notes = Normalizer.freeText(notes, 200);
         return s;
     }
 

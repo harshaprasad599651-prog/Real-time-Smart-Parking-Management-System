@@ -35,6 +35,12 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final ActivityLogService activityLog;
     private final AuthTokenService tokenService;
+    /**
+     * A real BCrypt hash that no password matches. Unknown and inactive accounts are checked
+     * against it, so every sign-in costs one BCrypt comparison and the response time does not
+     * reveal which usernames exist.
+     */
+    private final String timingDummyHash;
 
     public UserService(UserRepository repository, PasswordEncoder passwordEncoder, ActivityLogService activityLog,
                        AuthTokenService tokenService) {
@@ -42,6 +48,7 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
         this.activityLog = activityLog;
         this.tokenService = tokenService;
+        this.timingDummyHash = passwordEncoder.encode(java.util.UUID.randomUUID().toString());
     }
 
     public UserDto createUser(@Valid @NotNull CreateUserRequest request, @NotBlank String actor) {
@@ -68,9 +75,11 @@ public class UserService {
      */
     public Optional<UserDto> authenticate(@NotBlank String username, @NotBlank String password) {
         String normalized = Normalizer.username(username);
-        Optional<User> user = repository.findByUsername(normalized)
-                .filter(User::isActive)
-                .filter(u -> passwordEncoder.matches(password, u.getPasswordHash()));
+        Optional<User> account = repository.findByUsername(normalized);
+        // Always exactly one BCrypt check, whether or not the account exists or is active (no timing leak).
+        boolean passwordOk = passwordEncoder.matches(password,
+                account.filter(User::isActive).map(User::getPasswordHash).orElse(timingDummyHash));
+        Optional<User> user = account.filter(User::isActive).filter(u -> passwordOk);
         activityLog.record(normalized,
                 user.isPresent() ? ActivityAction.LOGIN_SUCCESS : ActivityAction.LOGIN_FAILED,
                 user.isPresent() ? "Login successful" : "Login failed");

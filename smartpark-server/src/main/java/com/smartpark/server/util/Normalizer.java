@@ -13,8 +13,43 @@ public final class Normalizer {
     private static final Pattern VEHICLE_SEPARATORS = Pattern.compile("[\\s\\-]+");
     private static final Pattern VEHICLE_NUMBER = Pattern.compile("^[A-Z0-9]{2,12}$");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    /** Control and invisible formatting characters (line breaks, tabs, zero-width, bidi overrides ...). */
+    private static final Pattern CONTROL = Pattern.compile("[\\p{Cc}\\p{Cf}\\u2028\\u2029]");
+    private static final Pattern LABEL_UNSAFE = Pattern.compile("[^A-Za-z0-9 ._@-]");
+    private static final Pattern CLIENT_ID = Pattern.compile("^[A-Za-z0-9-]{8,64}$");
 
     private Normalizer() {
+    }
+
+    /**
+     * Free text from users (notes, descriptions, printer names): control characters become spaces,
+     * runs of whitespace collapse to one space, the result is trimmed and cut to {@code maxLength}.
+     * Blank input gives {@code null}. This keeps line breaks and invisible characters out of
+     * receipts, logs and the activity feed (no forged log lines).
+     */
+    public static String freeText(String raw, int maxLength) {
+        if (raw == null) {
+            return null;
+        }
+        String cleaned = WHITESPACE.matcher(CONTROL.matcher(raw).replaceAll(" ")).replaceAll(" ").trim();
+        if (cleaned.isEmpty()) {
+            return null;
+        }
+        return cleaned.length() > maxLength ? cleaned.substring(0, maxLength).trim() : cleaned;
+    }
+
+    /**
+     * Short identifiers chosen by a client, such as terminal names: free text limited to letters,
+     * digits, space and {@code . _ @ -} (anything else becomes {@code _}), or {@code fallback}.
+     */
+    public static String label(String raw, int maxLength, String fallback) {
+        String text = freeText(raw, maxLength);
+        return text == null ? fallback : LABEL_UNSAFE.matcher(text).replaceAll("_");
+    }
+
+    /** A client-generated connection id (UUID-like); anything else gives {@code null}. */
+    public static String clientId(String raw) {
+        return raw != null && CLIENT_ID.matcher(raw).matches() ? raw : null;
     }
 
     /** Upper-cases and removes spaces and hyphens: {@code "wp cab-1234" -> "WPCAB1234"}. */

@@ -28,7 +28,7 @@ public final class ApiDtos {
     public record LoginResponse(String token, String tokenType, Instant expiresAt, UserInfo user) {
     }
 
-    public record Health(String status, String service, Instant serverTime) {
+    public record Health(String status, String service, Instant serverTime, String database) {
     }
 
     public record CategoryStatistics(String categoryName, long compatibleSlots, long availableSlots, long parkedVehicles) {

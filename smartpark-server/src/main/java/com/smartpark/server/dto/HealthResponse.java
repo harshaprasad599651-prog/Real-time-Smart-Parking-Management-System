@@ -9,5 +9,5 @@ import java.time.Instant;
  * @param service    application name
  * @param serverTime current server time (UTC)
  */
-public record HealthResponse(String status, String service, Instant serverTime) {
+public record HealthResponse(String status, String service, Instant serverTime, String database) {
 }

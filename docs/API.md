@@ -43,7 +43,7 @@ Every `/api/**` request passes through `RoleCheckInterceptor`. Each controller m
 | Vehicle exit, exit search (`/api/parking/active/{v}`), history search (`/api/parking/sessions`) | `EXIT_OPERATOR`, `ADMIN` |
 | Every other `GET` (slots, categories, active sessions, one session, statistics) | any signed-in user |
 
-Missing, expired or revoked token: **401** `UNAUTHENTICATED`. Inactive account or wrong role: **403** `OPERATOR_NOT_AUTHORIZED`.
+Missing, expired or revoked token: **401** `UNAUTHENTICATED`. Inactive account or wrong role: **403** `OPERATOR_NOT_AUTHORIZED` (recorded in the activity log as `ACCESS_DENIED`). Five wrong passwords for one account within 15 minutes lock it for 5 minutes: **429** `TOO_MANY_LOGIN_ATTEMPTS`, even with the right password. See [SECURITY.md](SECURITY.md).
 
 > **Development only:** with `smartpark.security.operator-header-enabled=true` (env `SMARTPARK_ALLOW_OPERATOR_HEADER=true`), the server also trusts an `X-Operator: <username>` header **without a password**. It is `false` by default and must stay off in real use; the automated tests enable it for brevity.
 
@@ -156,7 +156,7 @@ Vehicle numbers are normalized: case, spaces and hyphens are ignored, so `wp cab
 | GET | `/api/parking/sessions/{ticketId}` | One session |
 | GET | `/api/statistics` | Occupancy and traffic statistics |
 | GET | `/api/activity?username=&role=&action=&limit=50` | Operator activity log, newest first (ADMIN). Optional filters: user, role (`ENTRY_OPERATOR` ...), action (`VEHICLE_ENTRY`, `LOGIN_SUCCESS` ...); limit 1-500 |
-| GET | `/api/health` | Server status and server time |
+| GET | `/api/health` | Server status, server time and database status: 200 `{"status":"UP","database":"UP"}`, or 503 `{"status":"DEGRADED","database":"DOWN"}` (public) |
 | GET | `/api/realtime/status` | Clients connected to the WebSocket (operator, role, terminal, address, last heartbeat) |
 
 ### Receipts (ENTRY_OPERATOR, ADMIN)
@@ -237,7 +237,8 @@ Validation errors also list the offending fields:
 | 404 | `NOT_FOUND`, `NO_ACTIVE_SESSION` |
 | 409 | `SLOT_UNAVAILABLE`, `VEHICLE_ALREADY_PARKED`, `DUPLICATE_RESOURCE`, `INVALID_STATE`, `CONCURRENT_UPDATE` |
 | 422 | `SLOT_NOT_COMPATIBLE` |
-| 503 | `DATABASE_UNAVAILABLE` |
+| 429 | `TOO_MANY_LOGIN_ATTEMPTS` (sign-in locked for a few minutes; `Retry-After` header and `retryAfterSeconds`) |
+| 503 | `DATABASE_UNAVAILABLE` (MongoDB unreachable or timed out; reported within about 5 s, the server recovers by itself) |
 | 500 | `INTERNAL_ERROR` (details are only logged on the server) |
 
 ---

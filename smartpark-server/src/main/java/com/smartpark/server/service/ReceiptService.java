@@ -1,5 +1,6 @@
 package com.smartpark.server.service;
 
+import com.smartpark.server.util.Normalizer;
 import com.smartpark.server.document.ActivityAction;
 import com.smartpark.server.document.ParkingSession;
 import com.smartpark.server.document.TicketReceipt;
@@ -61,7 +62,7 @@ public class ReceiptService {
     public ReceiptDto recordPrint(String ticketId, String username, String printerName) {
         userService.requireOperator(username, PRINT_ROLES);
         ParkingSession existing = find(ticketId);
-        String printer = printerName == null || printerName.isBlank() ? null : printerName.trim();
+        String printer = Normalizer.freeText(printerName, 120);
 
         if (existing.getReceipt() == null) {
             // Session created before ticket information was stored: attach it once.

@@ -105,6 +105,8 @@ public class VehicleEntryController extends LiveView {
             Set.of("VEHICLE_ENTERED", "VEHICLE_EXITED", "PARKING_MAP_UPDATED"));
     private final ChangeListener<ConnectionState> connectionListener = (obs, old, s) -> updateConfirmState();
     private boolean busy;
+    /** Vehicle of the last entry request, to verify its outcome if no answer arrives. */
+    private String lastRequestedVehicle = "";
 
     public VehicleEntryController(AppContext context) {
         super(context);
@@ -277,7 +279,8 @@ public class VehicleEntryController extends LiveView {
         }
 
         setBusy(true);
-        parking.registerEntry(new EntryRequest(vehicleField.getText().trim(), category.categoryName(), slot.slotCode(), notes))
+        lastRequestedVehicle = vehicleField.getText().trim();
+        parking.registerEntry(new EntryRequest(lastRequestedVehicle, category.categoryName(), slot.slotCode(), notes))
                 .whenComplete((session, error) -> Platform.runLater(() -> {
                     setBusy(false);
                     if (error == null) {
@@ -356,6 +359,33 @@ public class VehicleEntryController extends LiveView {
         vehicleField.requestFocus();
     }
 
+    /**
+     * The entry request got no answer (network drop or timeout). It may still have been saved
+     * on the server, so the outcome is checked instead of guessed: if the vehicle now has an
+     * ACTIVE session, the allocation succeeded and the ticket is shown as usual. A blind retry
+     * would be safe anyway (the server refuses a second session for the same vehicle), but the
+     * operator must not be told "nothing was saved" when it was.
+     */
+    private void verifyUnansweredEntry(SlotInfo slot) {
+        String vehicle = VehicleNumbers.normalize(lastRequestedVehicle);
+        showError("No answer from the server. Checking whether vehicle " + vehicle + " was registered...");
+        setBusy(true);
+        parking.activeSessions().whenComplete((sessions, error) -> Platform.runLater(() -> {
+            setBusy(false);
+            if (error != null) {
+                showError("No answer from the server, so it is not known whether " + vehicle + " was registered. "
+                        + "When the connection is back, check the map before trying again; the server never "
+                        + "registers the same vehicle twice.");
+                return;
+            }
+            sessions.stream().filter(s -> s.vehicleNumber().equals(vehicle)).findFirst().ifPresentOrElse(
+                    session -> onAllocated(session, session.parkingSlotCode().equals(slot.slotCode()) ? slot
+                            : map.get(session.parkingSlotCode()).orElse(slot)),
+                    () -> showError("The server did not register " + vehicle + " (no answer in time). "
+                            + "Nothing was saved; try again."));
+        }));
+    }
+
     private void onAllocationRejected(ApiException e, SlotInfo slot) {
         switch (e.code()) {
             case "SLOT_UNAVAILABLE", "CONCURRENT_UPDATE" -> {
@@ -370,7 +400,7 @@ public class VehicleEntryController extends LiveView {
                 refresh();
             }
             case "VALIDATION_FAILED" -> showError(e.userMessage());
-            case ApiException.SERVER_UNREACHABLE -> showError("The server cannot be reached. Nothing was saved; try again.");
+            case ApiException.SERVER_UNREACHABLE -> verifyUnansweredEntry(slot);
             default -> {
                 if (!e.isUnauthorized()) { // 401 is handled globally (back to login)
                     showError(e.userMessage());

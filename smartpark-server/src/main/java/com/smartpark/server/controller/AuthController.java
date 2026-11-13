@@ -1,5 +1,11 @@
 package com.smartpark.server.controller;
 
+import com.smartpark.server.exception.TooManyLoginAttemptsException;
+import com.smartpark.server.security.LoginAttemptLimiter;
+import com.smartpark.server.util.Normalizer;
+import jakarta.servlet.http.HttpServletRequest;
+import java.time.Duration;
+import java.util.Optional;
 import com.smartpark.server.security.PublicEndpoint;
 import com.smartpark.server.document.ActivityAction;
 import com.smartpark.server.dto.LoginRequest;
@@ -36,11 +42,14 @@ public class AuthController {
     private final UserService userService;
     private final AuthTokenService tokenService;
     private final ActivityLogService activityLog;
+    private final LoginAttemptLimiter loginLimiter;
 
-    public AuthController(UserService userService, AuthTokenService tokenService, ActivityLogService activityLog) {
+    public AuthController(UserService userService, AuthTokenService tokenService, ActivityLogService activityLog,
+                          LoginAttemptLimiter loginLimiter) {
         this.userService = userService;
         this.tokenService = tokenService;
         this.activityLog = activityLog;
+        this.loginLimiter = loginLimiter;
     }
 
     @PublicEndpoint
@@ -48,16 +57,33 @@ public class AuthController {
     @SecurityRequirements // no token needed to log in
     @Operation(summary = "Sign in",
             description = "Checks the BCrypt password hash. Returns a bearer token for the REST API and the WebSocket. "
-                    + "Wrong password, unknown user and inactive account all give the same 401 INVALID_CREDENTIALS.")
+                    + "Wrong password, unknown user and inactive account all give the same 401 INVALID_CREDENTIALS. "
+                    + "After repeated failures the account (or computer) is locked for a few minutes: 429 "
+                    + "TOO_MANY_LOGIN_ATTEMPTS with a Retry-After header.")
     @ApiErrorResponses.Ok
     @ApiResponse(responseCode = "401", description = "INVALID_CREDENTIALS")
+    @ApiResponse(responseCode = "429", description = "TOO_MANY_LOGIN_ATTEMPTS")
     @ApiErrorResponses.BadRequest
-    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
-        UserDto user = userService.authenticate(request.username(), request.password())
-                .orElseThrow(InvalidCredentialsException::new);
-        String terminal = request.terminal() == null || request.terminal().isBlank() ? "UNKNOWN" : request.terminal().trim();
-        IssuedToken token = tokenService.issue(user.username(), user.role(), terminal);
-        return new LoginResponse(token.token(), "Bearer", token.expiresAt(), user);
+    public LoginResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
+        String username = Normalizer.username(request.username());
+        String address = http.getRemoteAddr();
+        Optional<Duration> locked = loginLimiter.lockedFor(username, address);
+        if (locked.isPresent()) {
+            activityLog.record(username, ActivityAction.LOGIN_LOCKED, "Sign-in refused while locked (from " + address + ")");
+            throw new TooManyLoginAttemptsException(locked.get());
+        }
+        Optional<UserDto> user = userService.authenticate(request.username(), request.password());
+        if (user.isEmpty()) {
+            if (loginLimiter.recordFailure(username, address)) {
+                activityLog.record(username, ActivityAction.LOGIN_LOCKED,
+                        "Locked after repeated failed sign-ins (from " + address + ")");
+            }
+            throw new InvalidCredentialsException();
+        }
+        loginLimiter.recordSuccess(username);
+        String terminal = Normalizer.label(request.terminal(), 40, "UNKNOWN");
+        IssuedToken token = tokenService.issue(user.get().username(), user.get().role(), terminal);
+        return new LoginResponse(token.token(), "Bearer", token.expiresAt(), user.get());
     }
 
     @GetMapping("/me")

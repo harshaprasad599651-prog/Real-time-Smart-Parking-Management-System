@@ -7,6 +7,10 @@ public enum ActivityAction {
     USER_ROLE_CHANGED,
     LOGIN_SUCCESS,
     LOGIN_FAILED,
+    /** Too many failed sign-ins: account or computer temporarily locked. */
+    LOGIN_LOCKED,
+    /** A signed-in user called an operation their role does not allow (403). */
+    ACCESS_DENIED,
     LOGOUT,
     CATEGORY_CREATED,
     CATEGORY_UPDATED,

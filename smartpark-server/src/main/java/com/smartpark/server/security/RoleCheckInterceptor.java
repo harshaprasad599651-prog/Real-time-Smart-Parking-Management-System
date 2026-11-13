@@ -1,5 +1,8 @@
 package com.smartpark.server.security;
 
+import com.smartpark.server.document.ActivityAction;
+import com.smartpark.server.exception.OperatorNotAuthorizedException;
+import com.smartpark.server.service.ActivityLogService;
 import com.smartpark.server.document.User;
 import com.smartpark.server.document.UserRole;
 import com.smartpark.server.service.UserService;
@@ -36,10 +39,13 @@ public class RoleCheckInterceptor implements HandlerInterceptor {
 
     private final RequestAuthenticator authenticator;
     private final UserService userService;
+    private final ActivityLogService activityLog;
 
-    public RoleCheckInterceptor(RequestAuthenticator authenticator, UserService userService) {
+    public RoleCheckInterceptor(RequestAuthenticator authenticator, UserService userService,
+                                ActivityLogService activityLog) {
         this.authenticator = authenticator;
         this.userService = userService;
+        this.activityLog = activityLog;
     }
 
     @Override
@@ -49,7 +55,16 @@ public class RoleCheckInterceptor implements HandlerInterceptor {
         }
         AuthenticatedOperator caller = authenticator.authenticate(request.getHeader(HttpHeaders.AUTHORIZATION),
                 request.getHeader(RequestAuthenticator.OPERATOR_HEADER));          // 401
-        User user = userService.requireOperator(caller.username(), requiredRoles(method)); // 403
+        Set<UserRole> required = requiredRoles(method);
+        User user;
+        try {
+            user = userService.requireOperator(caller.username(), required); // 403
+        } catch (OperatorNotAuthorizedException e) {
+            // Audit trail: a signed-in user tried something their role does not allow.
+            activityLog.record(caller.username(), ActivityAction.ACCESS_DENIED,
+                    request.getMethod() + " " + request.getRequestURI() + " refused (requires " + required + ")");
+            throw e;
+        }
         request.setAttribute(ATTRIBUTE, new AuthenticatedOperator(user.getUsername(), user.getRole()));
         return true;
     }
